@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin:0 0 14px">Redeem sign-in code</h2>
+
+<div class="card" style="max-width:560px;margin-bottom:16px">
+  <form method="post" id="redeem-form">
+    <label style="display:block;color:#cbd5e1;margin-bottom:6px">Your @mantapnet.com email</label>
+    <input type="email" name="email" required placeholder="contoh@mantapnet.com"
+           style="width:90%;padding:12px 14px;border-radius:10px;border:1px solid #2a344a;background:#0f1a2f;color:#e5e7eb">
+
+    <div style="display:flex;gap:10px;align-items:center;margin-top:12px">
+      <button class="btn" type="submit">Get code</button>
+      <div id="loading" style="display:none;color:#94a3b8">Checking mailbox…</div>
+    </div>
+  </form>
+
+  {% if email %}
+    <div style="color:#94a3b8;margin-top:10px">Entered: {{ email }}</div>
+  {% endif %}
+  {% if code %}
+    <div style="margin-top:14px;padding:12px;border:1px dashed #334155;border-radius:12px;background:#0b1327">
+      <div style="color:#93c5fd;font-size:13px;margin-bottom:6px">Your code</div>
+      <div style="font-size:36px;font-weight:800;letter-spacing:.1em;color:#22d3ee">{{ code }}</div>
+    </div>
+  {% elif error %}
+    <div style="margin-top:14px;color:#fda4af">{{ error }}</div>
+  {% endif %}
+</div>
+
+<div class="card" style="max-width:900px">
+  <h3 style="margin:0 0 10px">How to use</h3>
+  <ol style="margin:0 0 12px 18px;color:#cbd5e1">
+    <li>On Netflix choose <strong>Send sign-in code</strong>.</li>
+    <li>Enter the email you used and redeem the 4-digit code here.</li>
+  </ol>
+  <video controls width="100%" style="border-radius:12px;outline:1px solid #1f2b4a">
+    <source src="https://github.com/moviemembership/sign-in-code/raw/37911e20063a9614b02e63b8dee780ea08882b44/SIGNINCODE.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+</div>
+
+<script>
+  document.getElementById("redeem-form").addEventListener("submit", function(){
+    const l = document.getElementById("loading"); if(l) l.style.display="block";
+  });
+</script>
+{% endblock %}

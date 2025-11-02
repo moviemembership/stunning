@@ -1,0 +1,109 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ title or "Mantapnet" }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#9ca3af; --accent:#22d3ee; }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:#0b1020; color:var(--text); }
+    a { color: var(--accent); text-decoration: none; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 16px; }
+
+    /* Top nav */
+    .nav {
+      position: sticky; top:0; z-index:20;
+      background:linear-gradient(90deg,#0b1020,#0d1022);
+      border-bottom:1px solid #1f2937;
+    }
+    .nav-inner {
+      display:flex; align-items:center; justify-content:space-between; gap:16px;
+    }
+    .brand {
+      display:flex; align-items:center; gap:10px; font-weight:700;
+    }
+    .brand-dot {
+      width:10px; height:10px; border-radius:999px;
+      background:var(--accent); box-shadow:0 0 20px var(--accent);
+    }
+    .nav-links { display:flex; gap:16px; }
+
+    /* Hero section */
+    .hero {
+      background: radial-gradient(1200px 400px at 50% -200px, rgba(34,211,238,0.18), transparent 70%);
+      padding: 48px 0;
+      border-bottom:1px solid #1f2937;
+    }
+    .hero h1 { font-size: clamp(24px, 4vw, 40px); margin: 0 0 10px; }
+    .hero p { color:var(--muted); margin:0; }
+
+    /* Cards */
+    .list { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap:16px; margin-top:20px; }
+    .card { background:#0e162e; border:1px solid #1f2b4a; border-radius:14px; padding:16px; }
+    .btn { display:inline-block; background:var(--accent); color:#001017; padding:10px 14px; border-radius:10px; font-weight:600; }
+    .card-link { text-decoration:none; color:inherit; }
+    .card-link .card { transition: transform .15s, box-shadow .15s; }
+    .card-link:hover .card {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+      border-color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <!-- NAVIGATION -->
+  <nav class="nav">
+    <div class="container nav-inner">
+      <a class="brand" href="/"><span class="brand-dot"></span> <span>Mantapnet</span></a>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/sign-in-code">Get sign-in code</a>
+        <a href="/household-code">Household Code</a>
+      </div>
+    </div>
+  </nav>
+
+  {% block topsection %}{% endblock %}
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+  // Simple hero slider script (optional)
+  (function(){
+    const hero = document.getElementById('hero');
+    if(!hero) return;
+    const slides = [...hero.querySelectorAll('.hero-slide')];
+    const dots   = [...hero.querySelectorAll('.dot')];
+    const prev   = hero.querySelector('.hero-nav.prev');
+    const next   = hero.querySelector('.hero-nav.next');
+
+    let i = 0, timer = null, AUTOPLAY_MS = 3500;
+
+    function go(n){
+      slides[i].classList.remove('active');
+      dots[i].classList.remove('active');
+      i = (n + slides.length) % slides.length;
+      slides[i].classList.add('active');
+      dots[i].classList.add('active');
+    }
+    function nextSlide(){ go(i+1) }
+    function prevSlide(){ go(i-1) }
+
+    if(prev && next){
+      prev.addEventListener('click', prevSlide);
+      next.addEventListener('click', nextSlide);
+    }
+    dots.forEach(d => d.addEventListener('click', () => go(parseInt(d.dataset.to,10)||0)));
+
+    function start(){ timer = setInterval(nextSlide, AUTOPLAY_MS) }
+    function stop(){ if(timer){ clearInterval(timer); timer=null } }
+
+    hero.addEventListener('mouseenter', stop);
+    hero.addEventListener('mouseleave', start);
+    start();
+  })();
+  </script>
+</body>
+</html>

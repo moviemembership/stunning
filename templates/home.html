@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block topsection %}
+
+<div class="hero-wrap">
+  <div id="hero" class="hero">
+
+    <!-- Slide 1: single banner image -->
+    <!--<div class="hero-slide active">
+      <a href="#"><img src="/static/img/banner1.png" alt="Banner 1"></a>
+    </div> -->
+
+    <!-- Slide 2: Hero Split #1 (Video + CTA to Sign-In Code) -->
+    <div class="hero-slide with-split active">
+      <section class="hero-split">
+        <div class="hero-left">
+          <div class="hero-video">
+            <iframe
+              src="https://www.youtube-nocookie.com/embed/kzE6bhaF6jk?modestbranding=1&rel=0&iv_load_policy=3"
+              title="How it works"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen>
+            </iframe>
+
+          </div>
+        </div>
+        <div class="hero-right">
+          <h1 class="hero-title">GET<br>SIGN IN<br>CODE NOW</h1>
+          <p class="hero-sub">BY YOURSELF IN OUR SYSTEM</p>
+          <br>
+          <a href="/redeem" class="btn hero-cta">GET NOW</a>
+        </div>
+      </section>
+    </div>
+    <!-- Slide 3: Hero Split #2 (Static visual + CTA to Household Code) -->
+    <div class="hero-slide with-split">
+      <section class="hero-split">
+        <div class="hero-left">
+          <div class="hero-video">
+            <iframe
+              src="https://www.youtube-nocookie.com/embed/3RdAtoE26Fw?modestbranding=1&rel=0&iv_load_policy=3"
+              title="How it works"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen>
+            </iframe>
+          </div>
+        </div>
+        <div class="hero-right">
+          <h1 class="hero-title">HOUSEHOLD<br>CODE</h1>
+          <p class="hero-sub">Temporary Access Code via email link</p>
+          <br>
+          <a href="/household-code" class="btn hero-cta">REDEEM CODE</a>
+        </div>
+      </section>
+    </div>
+
+    <!-- arrows -->
+    <button class="hero-nav prev" aria-label="Previous slide">‹</button>
+    <button class="hero-nav next" aria-label="Next slide">›</button>
+
+    <!-- dots -->
+    <div class="hero-dots">
+      <button class="dot active" data-to="0" aria-label="Slide 1"></button>
+      <button class="dot" data-to="1" aria-label="Slide 2"></button>
+
+    </div>
+  </div>
+</div>
+
+<style>
+.hero-wrap{ display:flex; justify-content:center; margin:14px 0 22px }
+.hero{
+  position:relative; width:100%; max-width:1100px; aspect-ratio: 16 / 6.2;
+  background:#0d1221; border-radius:12px; overflow:hidden;
+  outline:1px solid #1f2b4a;
+}
+/* slides should not block clicks when hidden */
+.hero-slide{
+  position:absolute;
+  inset:0;
+  opacity:0;
+  transition:opacity .4s ease;
+  pointer-events:none;      /* 👈 prevent invisible slide from stealing clicks */
+}
+.hero-slide.active{
+  opacity:1;
+  pointer-events:auto;      /* 👈 only the active slide is interactive */
+  z-index:1;
+}
+
+
+/* split layout */
+.hero-slide.with-split{ display:flex; align-items:center; justify-content:center; padding:20px; }
+.hero-split{
+  display:grid; grid-template-columns: 1.5fr 1fr; gap:40px; align-items:center;
+  width:100%; max-width:1100px; margin:0 auto; padding:0 16px;
+}
+.hero-left{ width:100% }
+.hero-video{ position:relative; width:100%; aspect-ratio:16/9; border-radius:14px; overflow:hidden; outline:1px solid #1f2b4a; }
+.hero-video iframe{ position:absolute; inset:0; width:100%; height:100%; }
+.hero-visual{ width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:14px; outline:1px solid #1f2b4a; }
+
+.hero-right{ color:#e5e7eb }
+.hero-title{ font-size: clamp(36px, 6vw, 78px); line-height:.95; margin:0 0 8px; font-weight:900; letter-spacing:.02em; }
+.hero-sub{ margin: 4px 0 16px; color:#9aa6bb; font-weight:700; letter-spacing:.06em; }
+.hero-cta{
+  display:inline-block; padding:12px 20px; border-radius:12px;
+  background:#fff; color:#1f2b4a; font-weight:800; border:1px solid #fff; transition:filter .25s;
+}
+.hero-cta:hover{ filter:brightness(1.08) }
+
+/* arrows */
+.hero-nav{
+  position:absolute; top:50%; transform:translateY(-50%);
+  width:42px; height:42px; border-radius:50%; border:none; cursor:pointer;
+  background:transparent; color:#fff; font-size:24px; font-weight:700;
+  display:grid; place-items:center; transition:background .25s, opacity .25s, transform .25s;
+  opacity:0; pointer-events:none; z-index:2;
+}
+.hero-nav.prev{ left:14px } .hero-nav.next{ right:14px }
+.hero:hover .hero-nav{ opacity:1; pointer-events:auto; }
+.hero-nav:hover{ background:#1f2b4a; transform:translateY(-50%) scale(1.05) }
+
+/* dots */
+.hero-dots{
+  position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+  display:flex; gap:8px; z-index:2;
+}
+.hero-dots .dot{ width:10px; height:10px; border-radius:50%; border:none; cursor:pointer; background:#ccc; opacity:.7; }
+.hero-dots .dot.active{ background:#1f2b4a; opacity:1 }
+
+/* responsive */
+@media (max-width: 960px){
+  .hero{ aspect-ratio:auto; }
+  .hero-split{ grid-template-columns:1fr; text-align:center; }
+}
+</style>
+
+<script>
+(function(){
+  const hero = document.getElementById('hero');
+  if(!hero) return;
+
+  const slides = [...hero.querySelectorAll('.hero-slide')];
+  const dots   = [...hero.querySelectorAll('.dot')];
+  const prev   = hero.querySelector('.hero-nav.prev');
+  const next   = hero.querySelector('.hero-nav.next');
+
+  let i = 0;
+  function go(n){
+    slides[i].classList.remove('active');
+    dots[i].classList.remove('active');
+    i = (n + slides.length) % slides.length;
+    slides[i].classList.add('active');
+    dots[i].classList.add('active');
+  }
+  function nextSlide(){ go(i+1) }
+  function prevSlide(){ go(i-1) }
+
+  prev.addEventListener('click', prevSlide);
+  next.addEventListener('click', nextSlide);
+  dots.forEach(d => d.addEventListener('click', () => go(parseInt(d.dataset.to,10)||0)));
+
+  // optional autoplay:
+  let timer = null, AUTOPLAY_MS = 4500;
+  function start(){ timer = setInterval(nextSlide, AUTOPLAY_MS) }
+  function stop(){ if(timer){ clearInterval(timer); timer=null } }
+  hero.addEventListener('mouseenter', stop);
+  hero.addEventListener('mouseleave', start);
+  start();
+})();
+</script>
+
+{% endblock %}
