@@ -15,9 +15,9 @@ REPLACEMENT_FILE = "/etc/secrets/replacements.txt"
 
 # ---------------- CONFIG ----------------
 
-IMAP_HOST   = os.getenv("IMAP_HOST", "mail.mantapnet.com")
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@mantapnet.com")
-ADMIN_PASS  = os.getenv("ADMIN_PASS", "fg#$Teds234")
+IMAP_HOST = "mail.mantapnet.com"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL")
+ADMIN_PASS = os.environ.get("ADMIN_PASS")
 
 # ---------------- FLASK APP ----------------
 app = Flask(__name__)
