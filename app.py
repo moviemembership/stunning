@@ -11,7 +11,7 @@ import requests
 from bs4 import BeautifulSoup
 import pathlib
 
-REPLACEMENTS_FILE = os.getenv("REPLACEMENTS_FILE", "replacements.txt")
+REPLACEMENT_FILE = "/etc/secrets/replacements.txt"
 
 # ---------------- CONFIG ----------------
 
@@ -209,28 +209,23 @@ def household_code():
                            email=entered if request.method == "POST" else "",
                            code=code, error=error)
 
-def _load_replacements():
-    """
-    Load pair lines from REPLACEMENTS_FILE with format:
-      source----target
-    Returns dict mapping lowercase(source)->target (original-case target).
-    If file missing, returns empty dict.
-    """
-    p = pathlib.Path(REPLACEMENTS_FILE)
-    if not p.exists():
-        return {}
-    out = {}
+def load_replacements():
+    """Load replacement mappings from the secret file into a dict."""
+    mapping = {}
     try:
-        for raw in p.read_text(encoding="utf-8", errors="ignore").splitlines():
-            line = raw.strip()
-            if not line or "----" not in line:
-                continue
-            src, tgt = [s.strip() for s in line.split("----", 1)]
-            if src and tgt:
-                out[src.lower()] = tgt  # case-insensitive lookup
+        if os.path.exists(REPLACEMENT_FILE):
+            with open(REPLACEMENT_FILE, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or "----" not in line:
+                        continue
+                    old, new = line.split("----", 1)
+                    mapping[old.strip().lower()] = new.strip()
     except Exception as e:
-        app.logger.exception("Failed to load replacements: %s", e)
-    return out
+        print(f"Error reading replacements file: {e}")
+    return mapping
+
+REPLACEMENTS = load_replacements()
 
 @app.route("/replace-email", methods=["GET", "POST"])
 def replace_email():
@@ -254,7 +249,7 @@ def replace_email():
                 # allow non-strict reject: still accept but warn
                 app.logger.info("replace-email: entered email didn't validate: %s", entered)
 
-            replacements = _load_replacements()
+            replacements = REPLACEMENTS.get(email_entered)
             repl = replacements.get(entered.lower())
             if repl:
                 # found — show replacement (target)
