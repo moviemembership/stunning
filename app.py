@@ -11,7 +11,7 @@ import requests
 from bs4 import BeautifulSoup
 import pathlib
 
-REPLACEMENT_FILE = "/etc/secrets/replacements.txt"
+REPLACEMENT_FILE = os.getenv("REPLACEMENTS_FILE", "/etc/secrets/replacements.txt")
 
 # ---------------- CONFIG ----------------
 
@@ -209,29 +209,28 @@ def household_code():
                            email=entered if request.method == "POST" else "",
                            code=code, error=error)
 
+
 def load_replacements():
     """Load replacement mappings from the secret file into a dict."""
     mapping = {}
     try:
         if os.path.exists(REPLACEMENT_FILE):
             with open(REPLACEMENT_FILE, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
+                for raw in f:
+                    line = raw.strip()
                     if not line or "----" not in line:
                         continue
                     old, new = line.split("----", 1)
                     mapping[old.strip().lower()] = new.strip()
     except Exception as e:
-        print(f"Error reading replacements file: {e}")
+        app.logger.exception("Error reading replacements file: %s", e)
     return mapping
-
-REPLACEMENTS = load_replacements()
 
 @app.route("/replace-email", methods=["GET", "POST"])
 def replace_email():
     """
     User enters a non-working email. If a replacement exists in the server-side
-    file it is returned. Otherwise show an 'account working' friendly message.
+    file it is returned. Otherwise show a friendly message.
     """
     result = None
     error = None
@@ -242,20 +241,19 @@ def replace_email():
         if not entered:
             error = "Please enter an email address."
         else:
-            # Basic validation-ish (don't strictly enforce domain)
+            # optional validation — don't block if invalid
             try:
                 validate_email(entered)
             except EmailNotValidError:
-                # allow non-strict reject: still accept but warn
-                app.logger.info("replace-email: entered email didn't validate: %s", entered)
+                app.logger.info("replace-email: non-validated address entered: %s", entered)
 
-            replacements = REPLACEMENTS.get(entered)
-            repl = replacements.get(entered.lower())
+            # HOT-RELOAD the mapping each request (so secret file edits apply)
+            mapping = load_replacements()
+            repl = mapping.get(entered.lower())
+
             if repl:
-                # found — show replacement (target)
                 result = {"found": True, "replacement": repl}
             else:
-                # not found
                 result = {"found": False}
 
     return render_template("replace_email.html", email=entered, result=result, error=error)
