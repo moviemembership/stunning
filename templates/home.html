@@ -18,7 +18,7 @@
               src="https://www.youtube-nocookie.com/embed/kzE6bhaF6jk?modestbranding=1&rel=0&iv_load_policy=3"
               title="How it works"
               frameborder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowfullscreen>
             </iframe>
 
@@ -41,7 +41,7 @@
               src="https://www.youtube-nocookie.com/embed/3RdAtoE26Fw?modestbranding=1&rel=0&iv_load_policy=3"
               title="How it works"
               frameborder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowfullscreen>
             </iframe>
           </div>
@@ -171,5 +171,54 @@
   start();
 })();
 </script>
+
+/* Desktop stays as-is; mobile gets content-height hero */
+@media (max-width: 768px){
+  .hero{
+    aspect-ratio: auto;       /* let content decide height */
+    height: auto;             /* important for iOS Safari */
+  }
+  /* keep carousel but don't let hidden slides eat taps/space */
+  .hero-slide{
+    position: static;         /* no absolute on mobile */
+    display: none;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .hero-slide.active{
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* stack split layout */
+  .hero-split{
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 12px;
+    text-align: center;
+  }
+  .hero-title{ font-size: clamp(28px, 9vw, 40px); }
+  .hero-sub{ font-size: 14px; }
+  .hero-cta{ width: 100%; }
+  .hero-dots{ bottom: 6px; }
+}
+
+/* hide the tall YouTube title bar on small screens by cropping a bit */
+@media (max-width: 768px){
+  .hero-video iframe{
+    clip-path: inset(26px 0 0 0);   /* tweak 20–34px if needed for your phone */
+  }
+}
+
+@media (max-width: 768px){
+  .nav-links{
+    gap: 16px;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+
 
 {% endblock %}
