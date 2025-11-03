@@ -249,7 +249,7 @@ def replace_email():
                 # allow non-strict reject: still accept but warn
                 app.logger.info("replace-email: entered email didn't validate: %s", entered)
 
-            replacements = REPLACEMENTS.get(email_entered)
+            replacements = REPLACEMENTS.get(entered)
             repl = replacements.get(entered.lower())
             if repl:
                 # found — show replacement (target)
