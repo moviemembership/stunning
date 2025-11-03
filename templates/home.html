@@ -130,80 +130,87 @@
 .hero-dots .dot{ width:10px; height:10px; border-radius:50%; border:none; cursor:pointer; background:#ccc; opacity:.7; }
 .hero-dots .dot.active{ background:#1f2b4a; opacity:1 }
 
-/* ===== MOBILE FIX FOR BOTH HERO SPLITS ===== */
+/* ===== MOBILE: center BOTH slides vertically & horizontally ===== */
 @media (max-width: 768px){
 
-  /* Let hero height be driven by content */
+  /* Hero is a grid that centers its only visible child (the active slide) */
   .hero{
-    aspect-ratio: auto;
-    height: auto;
-    padding: 12px 0;
-  }
-
-  /* Stack left/right vertically and center */
-  .hero-slide.with-split{
-    display: block;        /* stop weird centering issues */
-    padding: 10px;
-  }
-  .hero-split{
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-    text-align: center;
-    justify-items: center; /* center children horizontally */
+    place-items: center;                      /* centers the active slide */
+    min-height: calc(100svh - 120px);         /* near full screen, minus nav */
+    height: auto;                             /* let content decide if taller */
+    aspect-ratio: auto;
+    padding: 0;                               /* kill extra padding */
   }
 
-  /* Constrain media width so it doesn't look huge */
-  .hero-video,
-  .hero-visual{
-    width: 92%;
-    max-width: 520px;      /* nice compact width */
-    margin: 0 auto;
-    border-radius: 12px;
-    outline: 1px solid #1f2b4a;
-    overflow: hidden;
-  }
-
-  /* Video: keep 16:9 and trim YouTube title bar */
-  .hero-video{ aspect-ratio: 16/9; }
-  .hero-video iframe{
-    width: 100%; height: 100%;
-    clip-path: inset(26px 0 0 0); /* adjust 20–34px for your device if needed */
-  }
-
-  /* Text box + CTA */
-  .hero-title{
-    font-size: clamp(26px, 7vw, 34px);
-    line-height: 1.1;
-    margin-top: 4px;
-  }
-  .hero-sub{
-    font-size: 13px;
-    margin-bottom: 10px;
-  }
-  .hero-cta{
-    font-size: 14px;
-    padding: 10px 18px;
-    width: auto;           /* no full-width button */
-    margin: 0 auto;
-  }
-
-  /* Only the active slide should be visible/tappable */
+  /* Only the active slide is in the layout */
   .hero-slide{
     position: static;
     display: none;
     opacity: 0;
     pointer-events: none;
+    margin: 0;                                /* avoid slide margins */
   }
   .hero-slide.active{
     display: block;
     opacity: 1;
     pointer-events: auto;
+    width: 100%;
   }
 
-  /* Smaller controls */
-  .hero-nav{ width:32px; height:32px; font-size:20px; }
-  .hero-dots{ bottom: 6px; }
+  /* Split layout stacks and stays narrow */
+  .hero-slide.with-split{ padding: 0; }
+  .hero-split{
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    text-align: center;
+    justify-items: center;                    /* center children horizontally */
+    width: 100%;
+    max-width: 560px;                         /* keep the box compact */
+    margin: 0 auto;
+  }
+  .hero-left, .hero-right{ width: 100%; }
+
+  /* Media sizing */
+  .hero-video,
+  .hero-visual{
+    width: 92%;
+    max-width: 520px;
+    margin: 0 auto;
+    border-radius: 12px;
+    outline: 1px solid #1f2b4a;
+    overflow: hidden;
+  }
+  .hero-video{ aspect-ratio: 16/9; }
+  .hero-video iframe{
+    width: 100%; height: 100%;
+    clip-path: inset(22px 0 0 0);            /* hides YT title bar; tweak 18–28px */
+  }
+
+  /* Tight, centered text */
+  .hero-title{
+    font-size: clamp(26px, 7vw, 34px);
+    line-height: 1.1;
+    margin: 6px 0 6px;                        /* remove big margins that drift */
+  }
+  .hero-sub{
+    font-size: 13px;
+    margin: 0 0 10px;
+  }
+  .hero-cta{
+    font-size: 14px;
+    padding: 10px 18px;
+    width: auto;
+    margin: 0 auto;
+  }
+
+  /* Controls smaller, dots closer */
+  .hero-nav{ width: 32px; height: 32px; font-size: 20px; }
+  .hero-dots{ bottom: 8px; }
+  
+  /* Remove outer spacing that created top/bottom blank zones */
+  .hero-wrap{ margin: 8px 0 0; }
 }
 
 </style>
