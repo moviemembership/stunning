@@ -130,21 +130,67 @@
 .hero-dots .dot{ width:10px; height:10px; border-radius:50%; border:none; cursor:pointer; background:#ccc; opacity:.7; }
 .hero-dots .dot.active{ background:#1f2b4a; opacity:1 }
 
-/* responsive */
-@media (max-width: 960px){
-  .hero{ aspect-ratio:auto; }
-  .hero-split{ grid-template-columns:1fr; text-align:center; }
-}
-
-/* Desktop stays as-is; mobile gets content-height hero */
+/* ===== MOBILE FIX FOR BOTH HERO SPLITS ===== */
 @media (max-width: 768px){
+
+  /* Let hero height be driven by content */
   .hero{
-    aspect-ratio: auto;       /* let content decide height */
-    height: auto;             /* important for iOS Safari */
+    aspect-ratio: auto;
+    height: auto;
+    padding: 12px 0;
   }
-  /* keep carousel but don't let hidden slides eat taps/space */
+
+  /* Stack left/right vertically and center */
+  .hero-slide.with-split{
+    display: block;        /* stop weird centering issues */
+    padding: 10px;
+  }
+  .hero-split{
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    text-align: center;
+    justify-items: center; /* center children horizontally */
+  }
+
+  /* Constrain media width so it doesn't look huge */
+  .hero-video,
+  .hero-visual{
+    width: 92%;
+    max-width: 520px;      /* nice compact width */
+    margin: 0 auto;
+    border-radius: 12px;
+    outline: 1px solid #1f2b4a;
+    overflow: hidden;
+  }
+
+  /* Video: keep 16:9 and trim YouTube title bar */
+  .hero-video{ aspect-ratio: 16/9; }
+  .hero-video iframe{
+    width: 100%; height: 100%;
+    clip-path: inset(26px 0 0 0); /* adjust 20–34px for your device if needed */
+  }
+
+  /* Text box + CTA */
+  .hero-title{
+    font-size: clamp(26px, 7vw, 34px);
+    line-height: 1.1;
+    margin-top: 4px;
+  }
+  .hero-sub{
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+  .hero-cta{
+    font-size: 14px;
+    padding: 10px 18px;
+    width: auto;           /* no full-width button */
+    margin: 0 auto;
+  }
+
+  /* Only the active slide should be visible/tappable */
   .hero-slide{
-    position: static;         /* no absolute on mobile */
+    position: static;
     display: none;
     opacity: 0;
     pointer-events: none;
@@ -154,34 +200,12 @@
     opacity: 1;
     pointer-events: auto;
   }
-  /* stack split layout */
-  .hero-split{
-    grid-template-columns: 1fr;
-    gap: 16px;
-    padding: 12px;
-    text-align: center;
-  }
-  .hero-title{ font-size: clamp(28px, 9vw, 40px); }
-  .hero-sub{ font-size: 14px; }
-  .hero-cta{ width: 100%; }
+
+  /* Smaller controls */
+  .hero-nav{ width:32px; height:32px; font-size:20px; }
   .hero-dots{ bottom: 6px; }
 }
 
-/* hide the tall YouTube title bar on small screens by cropping a bit */
-@media (max-width: 768px){
-  .hero-video iframe{
-    clip-path: inset(26px 0 0 0);   /* tweak 20–34px if needed for your phone */
-  }
-}
-
-@media (max-width: 768px){
-  .nav-links{
-    gap: 16px;
-    overflow-x: auto;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-  }
-}
 </style>
 
 <script>
