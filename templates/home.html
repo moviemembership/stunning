@@ -145,9 +145,10 @@
 
   /* Show only active slide and make it a fixed viewport panel */
   .hero-slide{
-    position: absolute;
-    display: none;
+    position: flex;
+    inset:0;
     opacity: 0;
+    transition:opacity .4s ease;
     pointer-events: none;
     margin: 0;
   }
