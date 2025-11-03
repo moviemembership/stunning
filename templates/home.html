@@ -132,17 +132,18 @@
 
 /* ===== MOBILE: center BOTH slides vertically & horizontally ===== */
 /* ===== MOBILE: center each active slide, compact & consistent ===== */
+/* ===== FINAL MOBILE CENTERING (both slides) ===== */
 @media (max-width: 768px){
 
-  /* hero: no fixed ratio/padding; let the slide control height */
+  /* The outer hero is just a shell; the active slide controls layout */
   .hero{
     aspect-ratio: auto;
     height: auto;
     padding: 0;
-    display: block;          /* let slide be the layout unit */
+    display: block;
   }
 
-  /* only active slide shows; it owns the vertical centering */
+  /* Show only active slide and make it a fixed viewport panel */
   .hero-slide{
     position: static;
     display: none;
@@ -151,53 +152,53 @@
     margin: 0;
   }
   .hero-slide.active{
-    display: flex;                      /* center content inside the slide */
+    display: flex;
+    flex-direction: column;          /* center content vertically */
+    align-items: center;
+    justify-content: center;
+    height: calc(100svh - 110px);    /* fixed height ~ one screen minus navbar */
+    min-height: calc(100svh - 110px);
+    padding: 0;
+  }
+
+  /* Use flex instead of grid so we can easily keep it compact */
+  .hero-split{
+    display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: calc(90svh - 120px);   /* near full screen minus navbar */
-    width: 90%;
-    padding: 0;                         /* keep it tight */
-  }
-
-  /* split stacks + constrained width */
-  .hero-split{
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-    text-align: center;
-    justify-items: center;
+    gap: 10px;
     width: 100%;
-    max-width: 560px;
+    max-width: 520px;                /* keeps it from getting huge */
     margin: 0 auto;
+    text-align: center;
   }
-  .hero-left, .hero-right{ width: 100%; }
 
-  /* media sizing */
+  /* MEDIA: ensure it can NEVER make the slide taller than the viewport */
   .hero-video,
   .hero-visual{
     width: 92%;
-    max-width: 520px;
-    margin: 0 auto;
+    max-width: 480px;
+    aspect-ratio: 16/9;
+    max-height: 38svh;               /* <— cap media height */
     border-radius: 12px;
-    outline: 1px solid #1f2b4a;
     overflow: hidden;
+    outline: 1px solid #1f2b4a;
   }
-  .hero-video{ aspect-ratio: 16/9; }
   .hero-video iframe{
     width: 100%; height: 100%;
-    clip-path: inset(22px 0 0 0);       /* trim YT title bar; tweak 18–28px if needed */
+    clip-path: inset(22px 0 0 0);    /* trim YT bar; tweak 18–28px if needed */
   }
 
-  /* text & CTA (no <br> needed) */
+  /* TEXT: smaller + tight spacing so total stack fits */
   .hero-title{
-    font-size: clamp(26px, 7vw, 34px);
+    font-size: clamp(24px, 6.5vw, 32px);
     line-height: 1.1;
-    margin: 6px 0 6px;
+    margin: 4px 0 4px;
   }
   .hero-sub{
     font-size: 13px;
-    margin: 0 0 10px;
+    margin: 0 0 8px;
   }
   .hero-cta{
     font-size: 14px;
@@ -206,15 +207,14 @@
     margin: 0 auto;
   }
 
-  /* controls */
+  /* Controls smaller, dots closer */
   .hero-nav{ width: 32px; height: 32px; font-size: 20px; }
   .hero-dots{ bottom: 8px; }
 
-  /* tighten outer spacing */
+  /* Tight outer margin */
   .hero-wrap{ margin: 8px 0 0; }
 }
 
-}
 
 </style>
 
