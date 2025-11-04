@@ -10,7 +10,11 @@ import imaplib, email, re as _re
 import requests
 from bs4 import BeautifulSoup
 import pathlib
+import os, imaplib, email
+from flask import abort
 
+
+MAIL_PEEK_TOKEN = os.environ.get("EMAIL_PEEK_TOKEN")
 REPLACEMENT_FILE = os.getenv("REPLACEMENTS_FILE", "/etc/secrets/replacements.txt")
 
 # ---------------- CONFIG ----------------
@@ -267,6 +271,88 @@ def fon_link():
 def tv_link():
   external_url = "https://github.com/moviemembership/redeem-app/blob/main/tv.png?raw=true"
   return redirect(external_url)
+
+def _fmt_date(dt_str):
+    try:
+        tup = email.utils.parsedate_to_datetime(dt_str)
+        return tup.strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return dt_str or ""
+
+@app.route("/view-mails", methods=["GET", "POST"])
+def view_mails():
+    """
+    Admin-only page to preview the last 10 full HTML emails for a given address.
+    Not linked publicly — accessible only by direct link.
+    """
+    """
+    Hidden page: only accessible with a correct token in the URL.
+    Example: https://yourapp/peek-inbox?token=XXXX
+    """
+    token = request.args.get("token", "")
+    if not EMAIL_PEEK_TOKEN or token != EMAIL_PEEK_TOKEN:
+        abort(404)  # do not reveal page existence
+        
+    entered = request.form.get("email", "").strip() if request.method == "POST" else ""
+    rows, error = [], None
+
+    if request.method == "POST" and entered:
+        try:
+            mail = imaplib.IMAP4_SSL(IMAP_HOST)
+            mail.login(ADMIN_EMAIL, ADMIN_PASS)
+            mail.select("inbox")
+
+            # Search by TO field only (fast and precise)
+            search_crit = f'(TO "{entered}")'
+            status, data = mail.uid("search", None, search_crit)
+            uids = data[0].split() if status == "OK" and data and data[0] else []
+
+            if not uids:
+                error = f"No emails found sent to {entered}"
+            else:
+                # Get last 10 only
+                for uid in reversed(uids[-10:]):
+                    st, fetched = mail.uid("fetch", uid, "(BODY.PEEK[])")
+                    if st != "OK" or not fetched or not fetched[0]:
+                        continue
+
+                    msg = email.message_from_bytes(fetched[0][1])
+                    subj_raw = email.header.decode_header(msg.get("Subject", "")) or [("", None)]
+                    subject = ""
+                    for s, enc in subj_raw:
+                        try:
+                            subject += s.decode(enc or "utf-8", errors="ignore") if isinstance(s, bytes) else str(s)
+                        except Exception:
+                            subject += str(s)
+
+                    date_ = msg.get("Date", "")
+                    # extract HTML or plain body
+                    body = ""
+                    if msg.is_multipart():
+                        for part in msg.walk():
+                            ctype = part.get_content_type()
+                            disp = str(part.get("Content-Disposition"))
+                            if "attachment" in disp:
+                                continue
+                            if ctype == "text/html":
+                                body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
+                                break
+                            elif ctype == "text/plain" and not body:
+                                body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
+                    else:
+                        body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
+
+                    rows.append({
+                        "subject": subject.strip() or "(no subject)",
+                        "date": date_,
+                        "body": body
+                    })
+            mail.logout()
+        except Exception as e:
+            error = f"Error: {e}"
+
+    return render_template("view_mails.html", email=entered, rows=rows, error=error)
+
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
