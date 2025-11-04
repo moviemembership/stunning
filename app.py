@@ -14,7 +14,7 @@ import os, imaplib, email
 from flask import abort
 
 
-MAIL_PEEK_TOKEN = os.environ.get("EMAIL_PEEK_TOKEN")
+EMAIL_PEEK_TOKEN = os.environ.get("EMAIL_PEEK_TOKEN")
 REPLACEMENT_FILE = os.getenv("REPLACEMENTS_FILE", "/etc/secrets/replacements.txt")
 
 # ---------------- CONFIG ----------------
