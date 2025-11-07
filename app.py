@@ -130,7 +130,7 @@ def _extract_code_from_verification_link(url: str):
 @app.route("/household-code", methods=["GET", "POST"])
 def household_code():
     """
-    Looks for Netflix 'Temporary Access Code' / 'Kod akses sementara'
+    Looks for Netflix 'temporary access code' / 'Kod akses sementara'
     matching the entered @mantapnet.com email in the last 15 minutes.
     """
     code, error = None, None
@@ -148,7 +148,7 @@ def household_code():
             mail.select("inbox")
 
             since_str = (datetime.utcnow() - timedelta(days=1)).strftime("%d-%b-%Y")
-            s1, d1 = mail.uid("search", None, f'(SINCE {since_str} SUBJECT "Temporary Access Code")')
+            s1, d1 = mail.uid("search", None, f'(SINCE {since_str} SUBJECT "temporary access code")')
             s2, d2 = mail.uid("search", None, f'(SINCE {since_str} SUBJECT "Kod akses sementara")')
 
             ids1 = d1[0].split() if s1 == "OK" and d1 and d1[0] else []
