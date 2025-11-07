@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from flask import Flask, request, render_template, redirect, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from email_validator import validate_email, EmailNotValidError
@@ -159,28 +159,32 @@ def household_code():
                 error = "No recent 'Temporary Access Code' emails found."
             else:
                 matched_uid = None
-                cutoff = datetime.now(timezone.utc) - timedelta(minutes=15)
+                cutoff = datetime.now(UTC) - timedelta(minutes=20)   # a bit wider window
+                entered_l = entered.lower()
 
-                for uid in reversed(all_ids[-50:]):
+                # look at up to last 200 (safer if inbox busy)
+                for uid in reversed(all_ids[-200:]):
                     st_hdr, hdr = mail.uid("fetch", uid, '(BODY.PEEK[HEADER.FIELDS (DATE SUBJECT TO FROM)])')
                     if st_hdr != "OK" or not hdr or not hdr[0]:
                         continue
 
                     msg_hdr = email.message_from_bytes(hdr[0][1])
+
+                    # Parse header date -> aware UTC
                     dt_tuple = email.utils.parsedate_tz(msg_hdr.get("Date"))
-                    if not dt_tuple:
-                        continue
+                    if dt_tuple:
+                        sent_utc = datetime.fromtimestamp(email.utils.mktime_tz(dt_tuple), tz=UTC)
+                        # don't BREAK on older mail; just skip and continue
+                        if sent_utc < cutoff:
+                            continue
 
-                    sent_utc = datetime.fromtimestamp(email.utils.mktime_tz(dt_tuple), tz=timezone.utc)
-                    if sent_utc < cutoff:
-                        break
-
+                    # Fetch full body once and extract
                     st_body, body_data = mail.uid("fetch", uid, "(BODY.PEEK[])")
                     if st_body != "OK" or not body_data or not body_data[0]:
                         continue
 
                     body = _extract_email_body(email.message_from_bytes(body_data[0][1])) or ""
-                    if entered in body.lower():
+                    if entered_l in body.lower():
                         matched_uid = uid
                         break
 
