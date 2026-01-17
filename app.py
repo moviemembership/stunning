@@ -12,7 +12,8 @@ from bs4 import BeautifulSoup
 import pathlib
 import os, imaplib, email
 from flask import abort
-
+import socket
+socket.setdefaulttimeout(15)  # global timeout for IMAP socket
 
 EMAIL_PEEK_TOKEN = os.environ.get("EMAIL_PEEK_TOKEN")
 REPLACEMENT_FILE = os.getenv("REPLACEMENTS_FILE", "/etc/secrets/replacements.txt")
@@ -28,6 +29,27 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "devkey")  # required for session
 
 # ---------------- HELPERS ----------------
+def imap_connect():
+    m = imaplib.IMAP4_SSL(IMAP_HOST)
+    m.login(ADMIN_EMAIL, ADMIN_PASS)
+    m.select("INBOX")
+    return m
+
+def imap_uid_safe(mail, *args, retries=2):
+    for attempt in range(retries + 1):
+        try:
+            return mail.uid(*args)
+        except (imaplib.IMAP4.abort, imaplib.IMAP4.error, OSError) as e:s
+            # connection dropped (EOF) -> reconnect and retry
+            if attempt >= retries:
+                raise
+            try:
+                mail.logout()
+            except Exception:
+                pass
+            mail = imap_connect()
+    return None
+
 def _extract_email_body(msg):
     """Extracts readable content from email (text/plain or text/html)."""
     try:
@@ -67,7 +89,7 @@ def redeem():
 
             since_1day = (datetime.utcnow() - timedelta(days=1)).strftime("%d-%b-%Y")
             crit = f'(SINCE {since_1day} OR (SUBJECT "Your sign-in code") (SUBJECT "Kod daftar masuk anda"))'
-            status, data = mail.uid("search", None, crit)
+            status, data = imap_uid_safe("search", None, crit)
             if status != "OK" or not data or not data[0]:
                 error = "No recent sign-in email found."
             else:
@@ -75,7 +97,7 @@ def redeem():
                 cutoff = datetime.now(timezone.utc) - timedelta(minutes=15)
 
                 for uid in reversed(uids[-30:]):  # newest 30 only
-                    status, hdr = mail.uid("fetch", uid, '(BODY.PEEK[HEADER.FIELDS (DATE SUBJECT TO FROM)])')
+                    status, hdr = imap_uid_safe("fetch", uid, '(BODY.PEEK[HEADER.FIELDS (DATE SUBJECT TO FROM)])')
                     if status != "OK" or not hdr or not hdr[0]:
                         continue
 
@@ -87,7 +109,7 @@ def redeem():
                     if sent_utc < cutoff:
                         break
 
-                    status, body_data = mail.uid("fetch", uid, "(BODY.PEEK[])")
+                    status, body_data = imap_uid_safe("fetch", uid, "(BODY.PEEK[])")
                     if status != "OK" or not body_data or not body_data[0]:
                         continue
 
@@ -148,8 +170,8 @@ def household_code():
             mail.select("inbox")
 
             since_str = (datetime.utcnow() - timedelta(days=1)).strftime("%d-%b-%Y")
-            s1, d1 = mail.uid("search", None, f'(SINCE {since_str} SUBJECT "temporary access code")')
-            s2, d2 = mail.uid("search", None, f'(SINCE {since_str} SUBJECT "Kod akses sementara")')
+            s1, d1 = imap_uid_safe("search", None, f'(SINCE {since_str} SUBJECT "temporary access code")')
+            s2, d2 = imap_uid_safe("search", None, f'(SINCE {since_str} SUBJECT "Kod akses sementara")')
 
             ids1 = d1[0].split() if s1 == "OK" and d1 and d1[0] else []
             ids2 = d2[0].split() if s2 == "OK" and d2 and d2[0] else []
@@ -164,7 +186,7 @@ def household_code():
 
                 # look at up to last 200 (safer if inbox busy)
                 for uid in reversed(all_ids[-200:]):
-                    st_hdr, hdr = mail.uid("fetch", uid, '(BODY.PEEK[HEADER.FIELDS (DATE SUBJECT TO FROM)])')
+                    st_hdr, hdr = imap_uid_safe("fetch", uid, '(BODY.PEEK[HEADER.FIELDS (DATE SUBJECT TO FROM)])')
                     if st_hdr != "OK" or not hdr or not hdr[0]:
                         continue
 
@@ -179,7 +201,7 @@ def household_code():
                             continue
 
                     # Fetch full body once and extract
-                    st_body, body_data = mail.uid("fetch", uid, "(BODY.PEEK[])")
+                    st_body, body_data = imap_uid_safe("fetch", uid, "(BODY.PEEK[])")
                     if st_body != "OK" or not body_data or not body_data[0]:
                         continue
 
@@ -189,7 +211,7 @@ def household_code():
                         break
 
                 if matched_uid:
-                    st_full, full_data = mail.uid("fetch", matched_uid, "(BODY.PEEK[])")
+                    st_full, full_data = imap_uid_safe("fetch", matched_uid, "(BODY.PEEK[])")
                     if st_full == "OK" and full_data and full_data[0]:
                         full_msg = email.message_from_bytes(full_data[0][1])
                         body = _extract_email_body(full_msg) or ""
@@ -308,7 +330,7 @@ def view_mails():
 
             # Search by TO field only (fast and precise)
             search_crit = f'(TO "{entered}")'
-            status, data = mail.uid("search", None, search_crit)
+            status, data = imap_uid_safe("search", None, search_crit)
             uids = data[0].split() if status == "OK" and data and data[0] else []
 
             if not uids:
@@ -316,7 +338,7 @@ def view_mails():
             else:
                 # Get last 10 only
                 for uid in reversed(uids[-10:]):
-                    st, fetched = mail.uid("fetch", uid, "(BODY.PEEK[])")
+                    st, fetched = imap_uid_safe("fetch", uid, "(BODY.PEEK[])")
                     if st != "OK" or not fetched or not fetched[0]:
                         continue
 
