@@ -114,7 +114,7 @@ def redeem():
                     if sent_utc < cutoff:
                         break
 
-                    mail, (status, body_data) = imap_uid_safe("fetch", uid, "(BODY.PEEK[])")
+                    mail, (status, body_data) = imap_uid_safe(mail, "fetch", uid, "(BODY.PEEK[])")
                     if status != "OK" or not body_data or not body_data[0]:
                         continue
 
