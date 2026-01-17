@@ -13,7 +13,7 @@ import pathlib
 import os, imaplib, email
 from flask import abort
 import socket
-socket.setdefaulttimeout(15)  # global timeout for IMAP socket
+socket.setdefaulttimeout(12)  # global timeout for IMAP socket
 
 EMAIL_PEEK_TOKEN = os.environ.get("EMAIL_PEEK_TOKEN")
 REPLACEMENT_FILE = os.getenv("REPLACEMENTS_FILE", "/etc/secrets/replacements.txt")
@@ -55,6 +55,28 @@ def imap_uid_safe(mail, *args, retries=2):
             mail = imap_connect()
     raise last_err
 
+def imap_call(mail, fn, *args, retries=3):
+    """
+    fn: "uid" or "noop"
+    returns (mail, result)
+    """
+    last = None
+    for _ in range(retries):
+        try:
+            if fn == "uid":
+                return mail, mail.uid(*args)
+            if fn == "noop":
+                return mail, mail.noop()
+            raise ValueError("bad fn")
+        except (imaplib.IMAP4.abort, imaplib.IMAP4.error, OSError) as e:
+            last = e
+            try:
+                mail.logout()
+            except Exception:
+                pass
+            mail = imap_connect()
+    raise last
+
 def _extract_email_body(msg):
     """Extracts readable content from email (text/plain or text/html)."""
     try:
@@ -77,61 +99,96 @@ def index():
 # ---------------- SIGN-IN CODE (4-digit) ----------------
 @app.route("/sign-in-code", methods=["GET", "POST"])
 def redeem():
-    """
-    Finds Netflix sign-in code emails (EN/MY) in the last 15 minutes,
-    matching the entered email address inside the email body, and extracts a 4-digit code.
-    """
     code = None
     error = None
     entered = ""
 
     if request.method == "POST":
-        entered = (request.form.get("email") or "").strip()
-        try:
-            mail = imaplib.IMAP4_SSL(IMAP_HOST)
-            mail.login(ADMIN_EMAIL, ADMIN_PASS)
-            mail.select("inbox")
+        entered = (request.form.get("email") or "").strip().lower()
 
-            since_1day = (datetime.utcnow() - timedelta(days=1)).strftime("%d-%b-%Y")
-            crit = f'(SINCE {since_1day} OR (SUBJECT "Your sign-in code") (SUBJECT "Kod daftar masuk anda"))'
-            mail, (status, data) = imap_uid_safe(mail,"search", None, crit)
+        try:
+            mail = imap_connect()
+
+            since_1day = (datetime.now(UTC) - timedelta(days=1)).strftime("%d-%b-%Y")
+            crit = (
+                f'(SINCE {since_1day} '
+                f'(OR SUBJECT "Your sign-in code" SUBJECT "Kod daftar masuk anda"))'
+            )
+
+            mail, (status, data) = imap_uid_safe(mail, "search", None, crit)
             if status != "OK" or not data or not data[0]:
                 error = "No recent sign-in email found."
             else:
                 uids = data[0].split()
-                cutoff = datetime.now(timezone.utc) - timedelta(minutes=15)
+                cutoff = datetime.now(UTC) - timedelta(minutes=25)
 
-                for uid in reversed(uids[-30:]):  # newest 30 only
-                    mail, (status, hdr) = imap_uid_safe(mail,"fetch", uid, '(BODY.PEEK[HEADER.FIELDS (DATE SUBJECT TO FROM)])')
-                    if status != "OK" or not hdr or not hdr[0]:
+                for idx, uid in enumerate(reversed(uids[-60:]), start=1):
+                    # keep IMAP alive
+                    if idx % 8 == 0:
+                        try:
+                            mail.noop()
+                        except Exception:
+                            mail = imap_connect()
+
+                    # fetch header first
+                    mail, (st_hdr, hdr) = imap_uid_safe(
+                        mail,
+                        "fetch",
+                        uid,
+                        "(BODY.PEEK[HEADER.FIELDS (DATE)])"
+                    )
+                    if st_hdr != "OK" or not hdr or not hdr[0]:
                         continue
 
                     msg_hdr = email.message_from_bytes(hdr[0][1])
                     dt_tuple = email.utils.parsedate_tz(msg_hdr.get("Date"))
-                    if not dt_tuple:
-                        continue
-                    sent_utc = datetime.fromtimestamp(email.utils.mktime_tz(dt_tuple), tz=timezone.utc)
-                    if sent_utc < cutoff:
-                        break
+                    if dt_tuple:
+                        sent_utc = datetime.fromtimestamp(
+                            email.utils.mktime_tz(dt_tuple), tz=UTC
+                        )
+                        if sent_utc < cutoff:
+                            continue  # ❗ DO NOT break
 
-                    mail, (status, body_data) = imap_uid_safe(mail, "fetch", uid, "(BODY.PEEK[])")
-                    if status != "OK" or not body_data or not body_data[0]:
+                    # 🔥 fetch ONLY first 4KB of text (no EOF)
+                    mail, (st_body, body_data) = imap_uid_safe(
+                        mail,
+                        "fetch",
+                        uid,
+                        "(BODY.PEEK[TEXT]<0.4096>)"
+                    )
+                    if st_body != "OK" or not body_data or not body_data[0]:
                         continue
 
-                    body = _extract_email_body(email.message_from_bytes(body_data[0][1])) or ""
-                    if entered.lower() in body.lower():
-                        m = _re.search(r"\b\d{4}\b", body)
+                    snippet = body_data[0][1].decode(
+                        "utf-8", errors="ignore"
+                    )
+
+                    if entered in snippet.lower():
+                        m = _re.search(r"\b\d{4}\b", snippet)
                         if m:
                             code = m.group(0)
                             break
 
-                if not code and not error:
-                    error = "No recent sign-in email found for this address. Request a code again within 15 minutes."
-            mail.logout()
+                if not code:
+                    error = (
+                        "No recent sign-in email found for this address. "
+                        "Request a new code and try again within 25 minutes."
+                    )
+
+            try:
+                mail.logout()
+            except Exception:
+                pass
+
         except Exception as e:
             error = f"Error: {e}"
 
-    return render_template("sign_in_code.html", email=entered if request.method == "POST" else "", code=code, error=error)
+    return render_template(
+        "sign_in_code.html",
+        email=entered if request.method == "POST" else "",
+        code=code,
+        error=error
+    )
 
 # ---------------- HOUSEHOLD CODE ----------------
 def _extract_code_from_verification_link(url: str):
