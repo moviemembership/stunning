@@ -1,22 +1,23 @@
 import re
 from datetime import datetime, timedelta, timezone, UTC
-from flask import Flask, request, render_template, redirect, session
+from flask import Flask, request, render_template, redirect, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from email_validator import validate_email, EmailNotValidError
-import os
 import smtplib, ssl, secrets, time
 from email.message import EmailMessage
 import imaplib, email, re as _re
 import requests
 from bs4 import BeautifulSoup
 import pathlib
-import os, imaplib, email
+import os, imaplib, email, json
 from flask import abort
 import socket
 socket.setdefaulttimeout(12)  # global timeout for IMAP socket
 
 EMAIL_PEEK_TOKEN = os.environ.get("EMAIL_PEEK_TOKEN")
 REPLACEMENT_FILE = os.getenv("REPLACEMENTS_FILE", "/etc/secrets/replacements.txt")
+
+CLICK_COUNT_FILE = os.getenv("CLICK_COUNT_FILE", "/var/data/shopee_clicks.json")
 
 # ---------------- CONFIG ----------------
 
@@ -441,6 +442,29 @@ def view_mails():
 
     return render_template("view_mails.html", email=entered, rows=rows, error=error)
 
+def _read_click_count() -> int:
+    try:
+        if os.path.exists(CLICK_COUNT_FILE):
+            with open(CLICK_COUNT_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return int(data.get("total", 0))
+    except Exception:
+        pass
+    return 0
+
+def _write_click_count(total: int) -> None:
+    try:
+        os.makedirs(os.path.dirname(CLICK_COUNT_FILE), exist_ok=True)
+        with open(CLICK_COUNT_FILE, "w", encoding="utf-8") as f:
+            json.dump({"total": int(total)}, f)
+    except Exception:
+        pass
+
+@app.post("/track/shopee-click")
+def track_shopee_click():
+    total = _read_click_count() + 1
+    _write_click_count(total)
+    return jsonify({"ok": True, "total": total})
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
