@@ -171,7 +171,8 @@
       <h3 class="popup-title">New Shopee Account is LIVE 🔥</h3>
       <p class="popup-sub">Click below to visit our new store.</p>
 
-      <a class="popup-cta"
+      <a id="popupShopeeBtn"
+         class="popup-cta"
          href="https://shopee.com.my/vertex_world"
          target="_blank"
          rel="noopener noreferrer">
@@ -226,6 +227,7 @@
     const KEY = "mantapnet_popup_seen_session";
     const popup = document.getElementById("firstVisitPopup");
     const closeBtn = document.getElementById("popupCloseBtn");
+    const shopeeBtn = document.getElementById("popupShopeeBtn");
 
     if(!popup || !closeBtn) return;
 
@@ -241,23 +243,32 @@
       document.body.style.overflow = "";
     }
 
-    // 👉 SESSION-ONLY LOGIC
+    // show once per session
     if(!sessionStorage.getItem(KEY)){
       openPopup();
       sessionStorage.setItem(KEY, "1");
     }
 
     closeBtn.addEventListener("click", closePopup);
-
-    // click outside to close
     popup.addEventListener("click", function(e){
       if(e.target === popup) closePopup();
     });
-
-    // ESC to close
     document.addEventListener("keydown", function(e){
       if(e.key === "Escape") closePopup();
     });
+
+    // ✅ track click (non-blocking)
+    if (shopeeBtn) {
+      shopeeBtn.addEventListener("click", function(){
+        // sendBeacon won't block opening new tab
+        if (navigator.sendBeacon) {
+          const blob = new Blob([JSON.stringify({})], {type: "application/json"});
+          navigator.sendBeacon("/track/shopee-click", blob);
+        } else {
+          fetch("/track/shopee-click", { method: "POST" }).catch(()=>{});
+        }
+      });
+    }
   })();
   </script>
 </body>
