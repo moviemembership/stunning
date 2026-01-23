@@ -57,6 +57,88 @@
   color: #ff6a3d;
   text-shadow: 0 0 6px rgba(238, 77, 45, 0.6);
 }
+      /* ===== Popup (first visit) ===== */
+  .popup-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.65);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    z-index: 9999;
+  }
+  .popup-overlay.show{ display:flex; }
+
+  .popup-card{
+    width: min(420px, 92vw);
+    background:#0e162e;
+    border:1px solid #1f2b4a;
+    border-radius: 16px;
+    box-shadow: 0 18px 60px rgba(0,0,0,.55);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .popup-close{
+    position:absolute;
+    top:10px;
+    right:10px;
+    width:36px;
+    height:36px;
+    border-radius: 12px;
+    border:1px solid #243150;
+    background: rgba(15,26,47,.85);
+    color:#e5e7eb;
+    cursor:pointer;
+    font-size: 18px;
+    line-height: 1;
+    display:grid;
+    place-items:center;
+  }
+  .popup-close:hover{ filter:brightness(1.08); }
+
+  .popup-poster{
+    width: 100%;
+    aspect-ratio: 1 / 1;          /* 1:1 poster */
+    background: #0b1327;
+    outline: 1px solid #1f2b4a;
+    display:block;
+    object-fit: cover;
+  }
+
+  .popup-body{
+    padding: 14px 14px 16px;
+  }
+  .popup-title{
+    margin:0 0 6px;
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: .02em;
+    color:#e5e7eb;
+  }
+  .popup-sub{
+    margin:0 0 12px;
+    color:#9ca3af;
+    font-size: 13px;
+  }
+
+  .popup-cta{
+    display:block;
+    width:100%;
+    text-align:center;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background:#EE4D2D;
+    color:#fff;
+    font-weight: 900;
+    letter-spacing: .02em;
+    border: 1px solid rgba(255,255,255,.12);
+  }
+  .popup-cta:hover{
+    filter: brightness(1.05);
+    box-shadow: 0 0 18px rgba(238,77,45,.35);
+  }
   </style>
 </head>
 <body>
@@ -77,6 +159,27 @@
       </div>
     </div>
   </nav>
+  <!-- ===== First-visit Popup ===== -->
+<div id="firstVisitPopup" class="popup-overlay" aria-hidden="true">
+  <div class="popup-card" role="dialog" aria-modal="true" aria-label="Promotion">
+    <button class="popup-close" id="popupCloseBtn" aria-label="Close">✕</button>
+
+    <!-- 1:1 Poster -->
+    <img class="popup-poster" src="/static/img/popup_poster.png" alt="Promo Poster">
+
+    <div class="popup-body">
+      <h3 class="popup-title">New Shopee Account is LIVE 🔥</h3>
+      <p class="popup-sub">Click below to visit our new store.</p>
+
+      <a class="popup-cta"
+         href="https://shopee.com.my/vertex_world"
+         target="_blank"
+         rel="noopener noreferrer">
+        Visit New Shopee Now
+      </a>
+    </div>
+  </div>
+</div>
 
   {% block topsection %}{% endblock %}
 
@@ -118,6 +221,43 @@
     hero.addEventListener('mouseenter', stop);
     hero.addEventListener('mouseleave', start);
     start();
+  })();
+     (function(){
+    const KEY = "mantapnet_popup_seen_session";
+    const popup = document.getElementById("firstVisitPopup");
+    const closeBtn = document.getElementById("popupCloseBtn");
+
+    if(!popup || !closeBtn) return;
+
+    function openPopup(){
+      popup.classList.add("show");
+      popup.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closePopup(){
+      popup.classList.remove("show");
+      popup.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+    }
+
+    // 👉 SESSION-ONLY LOGIC
+    if(!sessionStorage.getItem(KEY)){
+      openPopup();
+      sessionStorage.setItem(KEY, "1");
+    }
+
+    closeBtn.addEventListener("click", closePopup);
+
+    // click outside to close
+    popup.addEventListener("click", function(e){
+      if(e.target === popup) closePopup();
+    });
+
+    // ESC to close
+    document.addEventListener("keydown", function(e){
+      if(e.key === "Escape") closePopup();
+    });
   })();
   </script>
 </body>
