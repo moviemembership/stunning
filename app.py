@@ -1,6 +1,6 @@
 import re
 from datetime import datetime, timedelta, timezone, UTC
-from flask import Flask, request, render_template, redirect, session, jsonify
+from flask import Flask, request, render_template, redirect, session, jsonify, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 from email_validator import validate_email, EmailNotValidError
 import smtplib, ssl, secrets, time
@@ -465,6 +465,10 @@ def track_shopee_click():
     total = _read_click_count() + 1
     _write_click_count(total)
     return jsonify({"ok": True, "total": total})
+
+@app.route('/google0dae518ec9a0e9f1.html')
+def google_verify():
+    return send_from_directory('.', 'google0dae518ec9a0e9f1.html')
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
