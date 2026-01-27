@@ -470,6 +470,10 @@ def track_shopee_click():
 def google_verify():
     return send_from_directory('.', 'google0dae518ec9a0e9f1.html')
 
+@app.route("/unable-to-log-in")
+def unable_to_log_in():
+    return render_template("unable_to_log_in.html")
+
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     app.run(debug=True)
