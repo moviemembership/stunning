@@ -1,143 +1,183 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Retrieve Household Code</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
 
-  <style>
-    * { box-sizing: border-box; }
+{% block content %}
 
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f4f7f6;
-      color: #333;
-      display: flex;
-      justify-content: center;
-      padding: 40px 20px;
-    }
+<style>
+  .outlook-wrapper {
+    max-width: 550px;
+    margin: 40px auto;
+  }
 
-    .container {
-      background: #fff;
-      max-width: 500px;
-      width: 100%;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-    }
+  .outlook-card {
+    background: #0e162e;
+    border: 1px solid #1f2b4a;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.35);
+  }
 
-    h2 {
-      text-align: center;
-      color: #d94d47;
-      margin-bottom: 25px;
-    }
+  .outlook-title {
+    text-align: center;
+    color: #EE4D2D;
+    margin-bottom: 25px;
+    font-size: 32px;
+    font-weight: 800;
+  }
 
-    label {
-      font-weight: bold;
-      display: block;
-      margin-bottom: 8px;
-    }
+  .outlook-label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 700;
+    color: #e5e7eb;
+  }
 
-    input[type="email"] {
-      width: 100%;
-      padding: 12px;
-      margin-bottom: 18px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 16px;
-    }
+  .outlook-input {
+    width: 100%;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid #243150;
+    background: #111827;
+    color: #fff;
+    font-size: 16px;
+    margin-bottom: 18px;
+  }
 
-    button {
-      width: 100%;
-      background: #d94d47;
-      color: white;
-      padding: 13px;
-      border: none;
-      border-radius: 6px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-    }
+  .outlook-input:focus {
+    outline: none;
+    border-color: #EE4D2D;
+    box-shadow: 0 0 0 3px rgba(238,77,45,0.2);
+  }
 
-    .code {
-      margin-top: 25px;
-      text-align: center;
-      font-size: 42px;
-      color: #2e7d32;
-      font-weight: bold;
-      letter-spacing: 8px;
-    }
+  .outlook-btn {
+    width: 100%;
+    border: none;
+    background: #EE4D2D;
+    color: white;
+    font-weight: 800;
+    font-size: 16px;
+    padding: 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
 
-    .error {
-      margin-top: 20px;
-      text-align: center;
-      color: #d32f2f;
-      font-weight: bold;
-      line-height: 1.5;
-    }
+  .outlook-btn:hover {
+    background: #ff623f;
+    transform: translateY(-1px);
+  }
 
-    .email-info {
-      margin-top: 18px;
-      text-align: center;
-      color: #555;
-      font-style: italic;
-    }
+  .code-box {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 54px;
+    font-weight: 900;
+    color: #22c55e;
+    letter-spacing: 10px;
+  }
 
-    #loading {
-      display: none;
-      text-align: center;
-      margin-top: 18px;
-      color: #555;
-      font-weight: bold;
-    }
+  .error-box {
+    margin-top: 22px;
+    text-align: center;
+    color: #ef4444;
+    font-weight: 700;
+    line-height: 1.7;
+  }
 
-    .instructions {
-      margin-top: 25px;
-      padding-top: 20px;
-      border-top: 1px solid #ddd;
-      font-size: 14px;
-      line-height: 1.6;
-    }
-  </style>
-</head>
+  .email-box {
+    margin-top: 18px;
+    text-align: center;
+    color: #9ca3af;
+    font-style: italic;
+  }
 
-<body>
-  <div class="container">
-    <h2>Retrieve Household Code</h2>
+  .loading-box {
+    display: none;
+    text-align: center;
+    margin-top: 18px;
+    color: #9ca3af;
+    font-weight: 700;
+  }
+
+  .instruction-box {
+    margin-top: 28px;
+    border-top: 1px solid #243150;
+    padding-top: 22px;
+    color: #d1d5db;
+    line-height: 1.8;
+  }
+
+  .instruction-box ol {
+    padding-left: 20px;
+  }
+</style>
+
+<div class="outlook-wrapper">
+  <div class="outlook-card">
+
+    <div class="outlook-title">
+      Retrieve Household Code
+    </div>
 
     <form method="POST" id="code-form">
-      <label>Enter Outlook / Hotmail Email:</label>
-      <input type="email" name="email" placeholder="example@hotmail.com" required>
-      <button type="submit">Get Household Code</button>
 
-      <div id="loading">Checking code, please wait...</div>
+      <label class="outlook-label">
+        Enter Outlook / Hotmail Email:
+      </label>
+
+      <input
+        class="outlook-input"
+        type="email"
+        name="email"
+        placeholder="example@hotmail.com"
+        required
+      >
+
+      <button class="outlook-btn" type="submit">
+        Get Household Code
+      </button>
+
+      <div class="loading-box" id="loading">
+        Checking code, please wait...
+      </div>
+
     </form>
 
     {% if email %}
-      <div class="email-info">Entered email: {{ email }}</div>
+      <div class="email-box">
+        Entered email: {{ email }}
+      </div>
     {% endif %}
 
     {% if code %}
-      <div class="code">{{ code }}</div>
-    {% elif error %}
-      <div class="error">{{ error }}</div>
+      <div class="code-box">
+        {{ code }}
+      </div>
     {% endif %}
 
-    <div class="instructions">
+    {% if error %}
+      <div class="error-box">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    <div class="instruction-box">
       <b>Instruction:</b>
+
       <ol>
         <li>Enter the Outlook / Hotmail email.</li>
         <li>Click Get Household Code.</li>
-        <li>Please wait around 1 minutes.</li>
+        <li>Please wait around 1 minutess.</li>
         <li>If the link expired, resend the code and try again.</li>
       </ol>
     </div>
-  </div>
 
-  <script>
-    document.getElementById("code-form").addEventListener("submit", function () {
-      document.getElementById("loading").style.display = "block";
-    });
-  </script>
-</body>
-</html>
+  </div>
+</div>
+
+<script>
+document.getElementById("code-form").addEventListener("submit", function () {
+  document.getElementById("loading").style.display = "block";
+});
+</script>
+
+{% endblock %}
