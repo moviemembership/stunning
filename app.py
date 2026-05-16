@@ -1,3 +1,5 @@
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
+from playwright.sync_api import sync_playwright
 import re
 from datetime import datetime, timedelta, timezone, UTC
 from flask import Flask, request, render_template, redirect, session, jsonify, send_from_directory
@@ -91,6 +93,95 @@ def _extract_email_body(msg):
             return payload.decode(errors="ignore") if isinstance(payload, (bytes, bytearray)) else str(payload)
     except Exception:
         return ""
+
+def get_outlook_household_code(user_email):
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-blink-features=AutomationControlled"
+                ]
+            )
+
+            context = browser.new_context(
+                viewport={"width": 940, "height": 760},
+                locale="zh-CN"
+            )
+
+            page = context.new_page()
+            page.set_default_timeout(20000)
+
+            page.goto("https://yz.naifei.store/#/login", wait_until="domcontentloaded")
+
+            page.locator("input").first.fill(user_email)
+            page.locator("button").first.click()
+
+            page.wait_for_timeout(5000)
+
+            body_text = page.locator("body").inner_text()
+
+            if "尚未获取到邮箱验证码数据" in body_text or "尚未获取" in body_text:
+                browser.close()
+                return None, "No household code found. Please request the code first."
+
+            if "邮箱验证码已过期" in body_text or "已过期" in body_text:
+                browser.close()
+                return None, "Link was expired. Please resend the code and try again."
+
+            confirm_clicked = False
+            code_page = page
+
+            for btn_text in ["OK", "确定"]:
+                if confirm_clicked:
+                    break
+
+                try:
+                    with context.expect_page(timeout=8000) as new_page_info:
+                        page.get_by_text(btn_text, exact=True).click(timeout=5000)
+
+                    code_page = new_page_info.value
+                    confirm_clicked = True
+
+                except Exception:
+                    try:
+                        page.get_by_text(btn_text, exact=True).click(timeout=5000)
+                        code_page = page
+                        confirm_clicked = True
+                    except Exception:
+                        pass
+
+            if not confirm_clicked:
+                browser.close()
+                return None, "Confirm button not found."
+
+            code_page.wait_for_load_state("domcontentloaded", timeout=30000)
+            code_page.wait_for_timeout(4000)
+
+            full_text = code_page.locator("body").inner_text()
+            full_url = code_page.url
+
+            if "This link is no longer valid" in full_text:
+                browser.close()
+                return None, "Link was expired. Please resend the code and try again."
+
+            if "邮箱验证码已过期" in full_text or "已过期" in full_text:
+                browser.close()
+                return None, "Link was expired. Please resend the code and try again."
+
+            match = re.search(r"\b\d{4}\b", full_text + " " + full_url)
+
+            browser.close()
+
+            if match:
+                return match.group(0), None
+
+            return None, "Code page opened, but no 4-digit code found."
+
+    except Exception as e:
+        return None, f"System error: {str(e)}"
 
 # ---------------- HOME ----------------
 @app.route("/")
@@ -190,6 +281,7 @@ def redeem():
         code=code,
         error=error
     )
+    
 
 # ---------------- HOUSEHOLD CODE ----------------
 def _extract_code_from_verification_link(url: str):
@@ -473,6 +565,23 @@ def google_verify():
 @app.route("/unable-to-log-in")
 def unable_to_log_in():
     return render_template("unable_to_log_in.html")
+
+@app.route("/outlook-code", methods=["GET", "POST"])
+def outlook_code():
+    code = None
+    error = None
+    entered = ""
+
+    if request.method == "POST":
+        entered = (request.form.get("email") or "").strip()
+        code, error = get_outlook_household_code(entered)
+
+    return render_template(
+        "outlook.html",
+        email=entered if request.method == "POST" else "",
+        code=code,
+        error=error
+    )
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
