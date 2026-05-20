@@ -124,7 +124,7 @@ def get_outlook_household_code(user_email):
             )
 
             page = context.new_page()
-            page.set_default_timeout(15000)
+            page.set_default_timeout(45000)
 
             # block heavy resources
             page.route(
@@ -134,10 +134,14 @@ def get_outlook_household_code(user_email):
                 else route.continue_()
             )
 
-            page.goto("https://yz.naifei.store/#/login", wait_until="domcontentloaded")
+            page.goto("https://yz.naifei.store/#/login", wait_until="domcontentloaded", timeout=60000)
 
-            page.locator("input").first.fill(user_email)
-            page.locator("button").first.click()
+            email_input = page.locator(
+                'input[placeholder*="邮箱"], input[placeholder*="email"], input[type="text"], input'
+            ).first
+            
+            email_input.wait_for(state="visible", timeout=45000)
+            email_input.fill(user_email)
 
             page.wait_for_timeout(1500)
 
