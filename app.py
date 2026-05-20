@@ -15,6 +15,7 @@ import pathlib
 import os, imaplib, email, json
 from flask import abort
 import socket
+import time
 socket.setdefaulttimeout(12)  # global timeout for IMAP socket
 
 EMAIL_PEEK_TOKEN = os.environ.get("EMAIL_PEEK_TOKEN")
@@ -31,6 +32,7 @@ ADMIN_PASS = os.environ.get("ADMIN_PASS")
 # ---------------- FLASK APP ----------------
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "devkey")  # required for session
+OUTLOOK_CACHE = {}
 
 # ---------------- HELPERS ----------------
 def imap_connect():
@@ -96,6 +98,15 @@ def _extract_email_body(msg):
         return ""
 
 def get_outlook_household_code(user_email):
+    cache_key = user_email.lower().strip()
+    now = time.time()
+
+    # cache for 2 minutes
+    if cache_key in OUTLOOK_CACHE:
+        cached = OUTLOOK_CACHE[cache_key]
+        if now - cached["time"] < 120:
+            return cached["code"], cached["error"]
+
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(
@@ -113,24 +124,36 @@ def get_outlook_household_code(user_email):
             )
 
             page = context.new_page()
-            page.set_default_timeout(20000)
+            page.set_default_timeout(15000)
+
+            # block heavy resources
+            page.route(
+                "**/*",
+                lambda route: route.abort()
+                if route.request.resource_type in ["image", "font", "media", "stylesheet"]
+                else route.continue_()
+            )
 
             page.goto("https://yz.naifei.store/#/login", wait_until="domcontentloaded")
 
             page.locator("input").first.fill(user_email)
             page.locator("button").first.click()
 
-            page.wait_for_timeout(5000)
+            page.wait_for_timeout(1500)
 
             body_text = page.locator("body").inner_text()
 
             if "尚未获取到邮箱验证码数据" in body_text or "尚未获取" in body_text:
                 browser.close()
-                return None, "No household code found. Please request the code first."
+                result = (None, "No household code found. Please request the code first.")
+                OUTLOOK_CACHE[cache_key] = {"time": now, "code": result[0], "error": result[1]}
+                return result
 
             if "邮箱验证码已过期" in body_text or "已过期" in body_text:
                 browser.close()
-                return None, "Link was expired. Please resend the code and try again."
+                result = (None, "Link was expired. Please resend the code and try again.")
+                OUTLOOK_CACHE[cache_key] = {"time": now, "code": result[0], "error": result[1]}
+                return result
 
             confirm_clicked = False
             code_page = page
@@ -140,15 +163,15 @@ def get_outlook_household_code(user_email):
                     break
 
                 try:
-                    with context.expect_page(timeout=8000) as new_page_info:
-                        page.get_by_text(btn_text, exact=True).click(timeout=5000)
+                    with context.expect_page(timeout=6000) as new_page_info:
+                        page.get_by_text(btn_text, exact=True).click(timeout=3000)
 
                     code_page = new_page_info.value
                     confirm_clicked = True
 
                 except Exception:
                     try:
-                        page.get_by_text(btn_text, exact=True).click(timeout=5000)
+                        page.get_by_text(btn_text, exact=True).click(timeout=3000)
                         code_page = page
                         confirm_clicked = True
                     except Exception:
@@ -156,30 +179,40 @@ def get_outlook_household_code(user_email):
 
             if not confirm_clicked:
                 browser.close()
-                return None, "Confirm button not found."
+                result = (None, "Confirm button not found.")
+                OUTLOOK_CACHE[cache_key] = {"time": now, "code": result[0], "error": result[1]}
+                return result
 
-            code_page.wait_for_load_state("domcontentloaded", timeout=30000)
-            code_page.wait_for_timeout(4000)
+            code_page.wait_for_load_state("domcontentloaded", timeout=15000)
+            code_page.wait_for_timeout(1500)
 
             full_text = code_page.locator("body").inner_text()
             full_url = code_page.url
 
             if "This link is no longer valid" in full_text:
                 browser.close()
-                return None, "Link was expired. Please resend the code and try again."
+                result = (None, "Link was expired. Please resend the code and try again.")
+                OUTLOOK_CACHE[cache_key] = {"time": now, "code": result[0], "error": result[1]}
+                return result
 
             if "邮箱验证码已过期" in full_text or "已过期" in full_text:
                 browser.close()
-                return None, "Link was expired. Please resend the code and try again."
+                result = (None, "Link was expired. Please resend the code and try again.")
+                OUTLOOK_CACHE[cache_key] = {"time": now, "code": result[0], "error": result[1]}
+                return result
 
             match = re.search(r"\b\d{4}\b", full_text + " " + full_url)
 
             browser.close()
 
             if match:
-                return match.group(0), None
+                result = (match.group(0), None)
+                OUTLOOK_CACHE[cache_key] = {"time": now, "code": result[0], "error": result[1]}
+                return result
 
-            return None, "Code page opened, but no 4-digit code found."
+            result = (None, "Code page opened, but no 4-digit code found.")
+            OUTLOOK_CACHE[cache_key] = {"time": now, "code": result[0], "error": result[1]}
+            return result
 
     except Exception as e:
         return None, f"System error: {str(e)}"
