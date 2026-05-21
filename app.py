@@ -28,15 +28,10 @@ CLICK_COUNT_FILE = os.getenv("CLICK_COUNT_FILE", "/var/data/shopee_clicks.json")
 
 SIGNIN_URL = "https://yzmen.4knaifei.cn"
 
-auto_async_playwright = None
-auto_async_browser = None
-auto_async_lock = asyncio.Lock()
-auto_request_count = 0
-
-outlook_async_playwright = None
-outlook_async_browser = None
-outlook_async_lock = asyncio.Lock()
-outlook_request_count = 0
+signin_playwright = None
+signin_browser = None
+signin_lock = threading.Lock()
+signin_request_count = 0
 
 OUTLOOK_URL = "https://yz.naifei.store/#/login"
 
@@ -220,54 +215,7 @@ def redeem():
 def get_auto_sign_in_code(account_email, account_password):
     return asyncio.run(_get_auto_sign_in_code_async(account_email, account_password))
 
-
-async def get_auto_browser():
-    global auto_async_playwright, auto_async_browser
-
-    if auto_async_browser is not None:
-        try:
-            if auto_async_browser.is_connected():
-                return auto_async_browser
-        except Exception:
-            pass
-
-    auto_async_playwright = await async_playwright().start()
-
-    auto_async_browser = await auto_async_playwright.chromium.launch(
-        headless=True,
-        args=[
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-blink-features=AutomationControlled"
-        ]
-    )
-
-    return auto_async_browser
-
-
-async def restart_auto_browser():
-    global auto_async_playwright, auto_async_browser, auto_request_count
-
-    try:
-        if auto_async_browser:
-            await auto_async_browser.close()
-    except Exception:
-        pass
-
-    try:
-        if auto_async_playwright:
-            await auto_async_playwright.stop()
-    except Exception:
-        pass
-
-    auto_async_playwright = None
-    auto_async_browser = None
-    auto_request_count = 0
-
-
 async def _get_auto_sign_in_code_async(account_email, account_password):
-    global auto_request_count
-
     real_password = account_password.strip()
 
     if real_password == "qwe222":
@@ -289,17 +237,17 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
 
     query_text = f"{account_email.strip()}----{real_password}"
 
-    async with auto_async_lock:
-        context = None
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled"
+            ]
+        )
 
         try:
-            auto_request_count += 1
-
-            if auto_request_count >= 20:
-                await restart_auto_browser()
-
-            browser = await get_auto_browser()
-
             context = await browser.new_context(
                 viewport={"width": 1400, "height": 900},
                 locale="en-US"
@@ -310,7 +258,7 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
 
             cdk_value = quote(query_text, safe="")
             auto_url = f"https://yzmen.4knaifei.cn//#/?cdk={cdk_value}"
-
+            
             await page.goto(
                 auto_url,
                 wait_until="domcontentloaded",
@@ -320,7 +268,7 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
             result = None
             start_time = time.time()
 
-            while time.time() - start_time < 10:
+            while time.time() - start_time < 15:
                 body_text = await page.locator("body").inner_text()
 
                 if "CDK Does Not Exist" in body_text:
@@ -339,7 +287,7 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
                 ok_btn = page.locator(".ant-modal-confirm-btns button").last
                 if await ok_btn.count() > 0:
                     await ok_btn.click(timeout=5000)
-                    await page.wait_for_timeout(800)
+                    await page.wait_for_timeout(1000)
             except Exception:
                 pass
 
@@ -361,7 +309,7 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
                         );
                     }
                     """,
-                    timeout=20000
+                    timeout=30000
                 )
             except Exception:
                 pass
@@ -369,8 +317,8 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
             final_text = await page.locator("body").inner_text()
 
             latest_code = None
-            inputs = await page.locator("input").all()
 
+            inputs = await page.locator("input").all()
             for inp in inputs:
                 try:
                     value = (await inp.input_value()).strip()
@@ -389,15 +337,10 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
             return None, "No 4-digit code found. Please send the sign-in code first and try again."
 
         except Exception as e:
-            await restart_auto_browser()
             return None, f"System error: {str(e)}"
 
         finally:
-            try:
-                if context:
-                    await context.close()
-            except Exception:
-                pass
+            await browser.close()
 
 # ---------------- OUTLOOK HOUSEHOLD CODE ----------------#
 
@@ -405,65 +348,18 @@ def get_outlook_household_code(user_email):
     return asyncio.run(_get_outlook_household_code_async(user_email))
 
 
-async def get_outlook_browser():
-    global outlook_async_playwright, outlook_async_browser
-
-    if outlook_async_browser is not None:
-        try:
-            if outlook_async_browser.is_connected():
-                return outlook_async_browser
-        except Exception:
-            pass
-
-    outlook_async_playwright = await async_playwright().start()
-
-    outlook_async_browser = await outlook_async_playwright.chromium.launch(
-        headless=True,
-        args=[
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-blink-features=AutomationControlled"
-        ]
-    )
-
-    return outlook_async_browser
-
-
-async def restart_outlook_async_browser():
-    global outlook_async_playwright, outlook_async_browser, outlook_request_count
-
-    try:
-        if outlook_async_browser:
-            await outlook_async_browser.close()
-    except Exception:
-        pass
-
-    try:
-        if outlook_async_playwright:
-            await outlook_async_playwright.stop()
-    except Exception:
-        pass
-
-    outlook_async_playwright = None
-    outlook_async_browser = None
-    outlook_request_count = 0
-
-
 async def _get_outlook_household_code_async(user_email):
-    global outlook_request_count
-
-    async with outlook_async_lock:
-        context = None
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled"
+            ]
+        )
 
         try:
-            outlook_request_count += 1
-
-            # restart every 20 requests to prevent memory leak
-            if outlook_request_count >= 20:
-                await restart_outlook_async_browser()
-
-            browser = await get_outlook_browser()
-
             context = await browser.new_context(
                 viewport={"width": 1800, "height": 900},
                 locale="en-US"
@@ -478,7 +374,7 @@ async def _get_outlook_household_code_async(user_email):
                 timeout=60000
             )
 
-            # Switch to English every request
+            # switch to English every time
             try:
                 await page.locator("text=简体中文").click(timeout=5000)
                 await page.get_by_text("English", exact=True).click(timeout=5000)
@@ -486,22 +382,18 @@ async def _get_outlook_household_code_async(user_email):
             except Exception:
                 pass
 
-            # Fill email
             await page.locator("input").first.wait_for(state="visible", timeout=30000)
             await page.locator("input").first.fill(user_email)
 
-            # Click Query verification code
             try:
                 await page.get_by_text("Query verification code", exact=True).click(timeout=10000)
             except Exception:
                 await page.locator("button").first.click(timeout=10000)
 
-            # Wait briefly for toast/modal
-            await page.wait_for_timeout(1200)
+            await page.wait_for_timeout(1500)
 
             body_text = await page.locator("body").inner_text()
 
-            # No data prompt
             if (
                 "The email verification code data has not been obtained yet" in body_text
                 or "尚未获取到邮箱验证码数据" in body_text
@@ -509,7 +401,6 @@ async def _get_outlook_household_code_async(user_email):
             ):
                 return None, "No household code found. Please make sure you sent the household code email first."
 
-            # Expired toast
             if (
                 "邮箱验证码已过期" in body_text
                 or "expired" in body_text.lower()
@@ -517,7 +408,6 @@ async def _get_outlook_household_code_async(user_email):
             ):
                 return None, "Link was expired. Please resend the code and try again."
 
-            # Click OK as soon as possible
             code_page = page
             clicked = False
 
@@ -544,7 +434,7 @@ async def _get_outlook_household_code_async(user_email):
                 return None, "Confirm button not found. Please try again."
 
             await code_page.wait_for_load_state("domcontentloaded", timeout=30000)
-            await code_page.wait_for_timeout(1200)
+            await code_page.wait_for_timeout(1500)
 
             full_text = await code_page.locator("body").inner_text()
             full_url = code_page.url
@@ -563,15 +453,10 @@ async def _get_outlook_household_code_async(user_email):
             return None, "Code page opened, but no 4-digit code found."
 
         except Exception as e:
-            await restart_outlook_async_browser()
             return None, f"System error: {str(e)}"
 
         finally:
-            try:
-                if context:
-                    await context.close()
-            except Exception:
-                pass
+            await browser.close()
 
 # ---------------- HOUSEHOLD CODE ----------------
 def _extract_code_from_verification_link(url: str):
