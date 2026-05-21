@@ -28,6 +28,11 @@ CLICK_COUNT_FILE = os.getenv("CLICK_COUNT_FILE", "/var/data/shopee_clicks.json")
 
 SIGNIN_URL = "https://yzmen.4knaifei.cn"
 
+auto_async_playwright = None
+auto_async_browser = None
+auto_async_lock = asyncio.Lock()
+auto_request_count = 0
+
 outlook_async_playwright = None
 outlook_async_browser = None
 outlook_async_lock = asyncio.Lock()
@@ -215,7 +220,54 @@ def redeem():
 def get_auto_sign_in_code(account_email, account_password):
     return asyncio.run(_get_auto_sign_in_code_async(account_email, account_password))
 
+
+async def get_auto_browser():
+    global auto_async_playwright, auto_async_browser
+
+    if auto_async_browser is not None:
+        try:
+            if auto_async_browser.is_connected():
+                return auto_async_browser
+        except Exception:
+            pass
+
+    auto_async_playwright = await async_playwright().start()
+
+    auto_async_browser = await auto_async_playwright.chromium.launch(
+        headless=True,
+        args=[
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-blink-features=AutomationControlled"
+        ]
+    )
+
+    return auto_async_browser
+
+
+async def restart_auto_browser():
+    global auto_async_playwright, auto_async_browser, auto_request_count
+
+    try:
+        if auto_async_browser:
+            await auto_async_browser.close()
+    except Exception:
+        pass
+
+    try:
+        if auto_async_playwright:
+            await auto_async_playwright.stop()
+    except Exception:
+        pass
+
+    auto_async_playwright = None
+    auto_async_browser = None
+    auto_request_count = 0
+
+
 async def _get_auto_sign_in_code_async(account_email, account_password):
+    global auto_request_count
+
     real_password = account_password.strip()
 
     if real_password == "qwe222":
@@ -237,17 +289,17 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
 
     query_text = f"{account_email.strip()}----{real_password}"
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled"
-            ]
-        )
+    async with auto_async_lock:
+        context = None
 
         try:
+            auto_request_count += 1
+
+            if auto_request_count >= 20:
+                await restart_auto_browser()
+
+            browser = await get_auto_browser()
+
             context = await browser.new_context(
                 viewport={"width": 1400, "height": 900},
                 locale="en-US"
@@ -258,7 +310,7 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
 
             cdk_value = quote(query_text, safe="")
             auto_url = f"https://yzmen.4knaifei.cn//#/?cdk={cdk_value}"
-            
+
             await page.goto(
                 auto_url,
                 wait_until="domcontentloaded",
@@ -287,7 +339,7 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
                 ok_btn = page.locator(".ant-modal-confirm-btns button").last
                 if await ok_btn.count() > 0:
                     await ok_btn.click(timeout=5000)
-                    await page.wait_for_timeout(1000)
+                    await page.wait_for_timeout(800)
             except Exception:
                 pass
 
@@ -317,8 +369,8 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
             final_text = await page.locator("body").inner_text()
 
             latest_code = None
-
             inputs = await page.locator("input").all()
+
             for inp in inputs:
                 try:
                     value = (await inp.input_value()).strip()
@@ -337,10 +389,15 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
             return None, "No 4-digit code found. Please send the sign-in code first and try again."
 
         except Exception as e:
+            await restart_auto_browser()
             return None, f"System error: {str(e)}"
 
         finally:
-            await browser.close()
+            try:
+                if context:
+                    await context.close()
+            except Exception:
+                pass
 
 # ---------------- OUTLOOK HOUSEHOLD CODE ----------------#
 
