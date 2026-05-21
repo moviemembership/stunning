@@ -34,17 +34,8 @@ OUTLOOK_URL = "https://yz.naifei.store/#/login"
 
 AUTO_SIGNIN_URL = "https://yzmen.4knaifei.cn"
 
-auto_signin_playwright = sync_playwright().start()
-
-auto_signin_browser = auto_signin_playwright.chromium.launch(
-    headless=True,
-    args=[
-        "--no-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-blink-features=AutomationControlled"
-    ]
-)
-
+auto_signin_playwright = None
+auto_signin_browser = None
 auto_signin_lock = threading.Lock()
 
 outlook_playwright = None
@@ -163,6 +154,25 @@ def restart_signin_browser():
     signin_playwright = None
     signin_browser = None
     signin_request_count = 0
+
+def get_auto_signin_browser():
+    global auto_signin_playwright, auto_signin_browser
+
+    if auto_signin_browser is not None:
+        return auto_signin_browser
+
+    auto_signin_playwright = sync_playwright().start()
+
+    auto_signin_browser = auto_signin_playwright.chromium.launch(
+        headless=True,
+        args=[
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-blink-features=AutomationControlled"
+        ]
+    )
+
+    return auto_signin_browser
 
 def start_outlook_browser():
     global outlook_playwright, outlook_browser
@@ -336,18 +346,17 @@ def get_auto_sign_in_code(account_email, account_password):
 
     query_text = f"{account_email.strip()}----{real_password}"
 
-    browser = None
-
     with auto_signin_lock:
-
+        context = None
+    
         try:
-            browser = auto_signin_browser
+            browser = get_auto_signin_browser()
     
             context = browser.new_context(
                 viewport={"width": 1400, "height": 900},
                 locale="en-US"
             )
-
+    
             page = context.new_page()
             page.set_default_timeout(30000)
 
@@ -490,10 +499,11 @@ def get_auto_sign_in_code(account_email, account_password):
 
         except Exception as e:
             return None, f"System error: {str(e)}"
-
+    
         finally:
             try:
-                context.close()
+                if context:
+                    context.close()
             except Exception:
                 pass
 
