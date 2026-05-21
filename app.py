@@ -30,6 +30,13 @@ signin_browser = None
 signin_lock = threading.Lock()
 signin_request_count = 0
 
+OUTLOOK_URL = "https://yz.naifei.store/#/login"
+
+outlook_playwright = None
+outlook_browser = None
+outlook_lock = threading.Lock()
+outlook_request_count = 0
+
 # ---------------- CONFIG ----------------
 
 IMAP_HOST = "mail.mantapnet.com"
@@ -103,95 +110,6 @@ def _extract_email_body(msg):
     except Exception:
         return ""
 
-def get_outlook_household_code(user_email):
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-blink-features=AutomationControlled"
-                ]
-            )
-
-            context = browser.new_context(
-                viewport={"width": 940, "height": 760},
-                locale="zh-CN"
-            )
-
-            page = context.new_page()
-            page.set_default_timeout(20000)
-
-            page.goto("https://yz.naifei.store/#/login", wait_until="domcontentloaded")
-
-            page.locator("input").first.fill(user_email)
-            page.locator("button").first.click()
-
-            page.wait_for_timeout(5000)
-
-            body_text = page.locator("body").inner_text()
-
-            if "尚未获取到邮箱验证码数据" in body_text or "尚未获取" in body_text:
-                browser.close()
-                return None, "No household code found. Please request the code first."
-
-            if "邮箱验证码已过期" in body_text or "已过期" in body_text:
-                browser.close()
-                return None, "Link was expired. Please resend the code and try again."
-
-            confirm_clicked = False
-            code_page = page
-
-            for btn_text in ["OK", "确定"]:
-                if confirm_clicked:
-                    break
-
-                try:
-                    with context.expect_page(timeout=8000) as new_page_info:
-                        page.get_by_text(btn_text, exact=True).click(timeout=5000)
-
-                    code_page = new_page_info.value
-                    confirm_clicked = True
-
-                except Exception:
-                    try:
-                        page.get_by_text(btn_text, exact=True).click(timeout=5000)
-                        code_page = page
-                        confirm_clicked = True
-                    except Exception:
-                        pass
-
-            if not confirm_clicked:
-                browser.close()
-                return None, "Confirm button not found."
-
-            code_page.wait_for_load_state("domcontentloaded", timeout=30000)
-            code_page.wait_for_timeout(4000)
-
-            full_text = code_page.locator("body").inner_text()
-            full_url = code_page.url
-
-            if "This link is no longer valid" in full_text:
-                browser.close()
-                return None, "Link was expired. Please resend the code and try again."
-
-            if "邮箱验证码已过期" in full_text or "已过期" in full_text:
-                browser.close()
-                return None, "Link was expired. Please resend the code and try again."
-
-            match = re.search(r"\b\d{4}\b", full_text + " " + full_url)
-
-            browser.close()
-
-            if match:
-                return match.group(0), None
-
-            return None, "Code page opened, but no 4-digit code found."
-
-    except Exception as e:
-        return None, f"System error: {str(e)}"
-
 # ---------------- SIGN IN CODE BROWSERS ----------------#
 def start_signin_browser():
     global signin_playwright, signin_browser
@@ -230,6 +148,45 @@ def restart_signin_browser():
     signin_playwright = None
     signin_browser = None
     signin_request_count = 0
+
+def start_outlook_browser():
+    global outlook_playwright, outlook_browser
+
+    if outlook_browser is not None:
+        return outlook_browser
+
+    outlook_playwright = sync_playwright().start()
+
+    outlook_browser = outlook_playwright.chromium.launch(
+        headless=True,
+        args=[
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-blink-features=AutomationControlled"
+        ]
+    )
+
+    return outlook_browser
+
+
+def restart_outlook_browser():
+    global outlook_playwright, outlook_browser, outlook_request_count
+
+    try:
+        if outlook_browser:
+            outlook_browser.close()
+    except:
+        pass
+
+    try:
+        if outlook_playwright:
+            outlook_playwright.stop()
+    except:
+        pass
+
+    outlook_playwright = None
+    outlook_browser = None
+    outlook_request_count = 0
 # ---------------- HOME ----------------
 @app.route("/")
 def index():
@@ -514,6 +471,131 @@ def get_auto_sign_in_code(account_email, account_password):
             try:
                 browser.close()
             except Exception:
+                pass
+
+# ---------------- OUTLOOK HOUSEHOLD CODE ----------------#
+
+def get_outlook_household_code(user_email):
+    global outlook_request_count
+
+    with outlook_lock:
+        browser = None
+        context = None
+
+        try:
+            outlook_request_count += 1
+
+            # restart every 20 requests to control RAM
+            if outlook_request_count >= 20:
+                restart_outlook_browser()
+
+            browser = start_outlook_browser()
+
+            context = browser.new_context(
+                viewport={"width": 1800, "height": 900},
+                locale="en-US"
+            )
+
+            page = context.new_page()
+            page.set_default_timeout(30000)
+
+            page.goto(OUTLOOK_URL, wait_until="domcontentloaded", timeout=60000)
+
+            # switch to English every time
+            try:
+                page.locator("text=简体中文").click(timeout=5000)
+                page.get_by_text("English", exact=True).click(timeout=5000)
+                page.wait_for_timeout(1000)
+            except Exception:
+                pass
+
+            # fill email
+            page.locator("input").first.wait_for(state="visible", timeout=30000)
+            page.locator("input").first.fill(user_email)
+
+            # click Query verification code
+            try:
+                page.get_by_text("Query verification code", exact=True).click(timeout=10000)
+            except Exception:
+                page.locator("button").first.click(timeout=10000)
+
+            # wait shortly only
+            page.wait_for_timeout(1500)
+
+            body_text = page.locator("body").inner_text()
+
+            # no email data prompt
+            if (
+                "The email verification code data has not been obtained yet" in body_text
+                or "尚未获取到邮箱验证码数据" in body_text
+                or "has not been obtained" in body_text
+            ):
+                return None, "No household code found. Please make sure you sent the household code email first."
+
+            # expired toast
+            if (
+                "邮箱验证码已过期" in body_text
+                or "expired" in body_text.lower()
+                or "已过期" in body_text
+            ):
+                return None, "Link was expired. Please resend the code and try again."
+
+            # click OK / 确定 as soon as possible
+            code_page = page
+            clicked = False
+
+            for txt in ["OK", "确定"]:
+                if clicked:
+                    break
+
+                try:
+                    with context.expect_page(timeout=8000) as new_page_info:
+                        page.get_by_text(txt, exact=True).click(timeout=3000)
+
+                    code_page = new_page_info.value
+                    clicked = True
+
+                except Exception:
+                    try:
+                        page.get_by_text(txt, exact=True).click(timeout=3000)
+                        code_page = page
+                        clicked = True
+                    except Exception:
+                        pass
+
+            if not clicked:
+                return None, "Confirm button not found. Please try again."
+
+            code_page.wait_for_load_state("domcontentloaded", timeout=30000)
+            code_page.wait_for_timeout(1500)
+
+            full_text = code_page.locator("body").inner_text()
+            full_url = code_page.url
+
+            # Netflix expired page
+            if "This link is no longer valid" in full_text:
+                return None, "Link was expired. Please resend the code and try again."
+
+            if "Please request again on the original device" in full_text:
+                return None, "Link was expired. Please resend the code and try again."
+
+            # find 4 digit code
+            match = re.search(r"\b\d{4}\b", full_text + " " + full_url)
+
+            if match:
+                return match.group(0), None
+
+            return None, "Code page opened, but no 4-digit code found."
+
+        except Exception as e:
+            restart_outlook_browser()
+            return None, f"System error: {str(e)}"
+
+        finally:
+            try:
+                if context:
+                    context.close()
+            except:
                 pass
 
 # ---------------- HOUSEHOLD CODE ----------------
