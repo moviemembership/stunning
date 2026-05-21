@@ -18,6 +18,7 @@ import pathlib
 import os, imaplib, email, json
 from flask import abort
 import socket
+from urllib.parse import quote
 socket.setdefaulttimeout(12)  # global timeout for IMAP socket
 
 EMAIL_PEEK_TOKEN = os.environ.get("EMAIL_PEEK_TOKEN")
@@ -298,16 +299,14 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
             page = await context.new_page()
             page.set_default_timeout(30000)
 
+            cdk_value = quote(query_text, safe="")
+            auto_url = f"https://yzmen.4knaifei.cn//#/?cdk={cdk_value}"
+            
             await page.goto(
-                "https://yzmen.4knaifei.cn",
+                auto_url,
                 wait_until="domcontentloaded",
                 timeout=45000
             )
-
-            await page.locator("input").first.wait_for(state="visible", timeout=30000)
-            await page.locator("input").first.fill(query_text)
-
-            await page.get_by_text("Exchange", exact=True).click(timeout=10000)
 
             result = None
             start_time = time.time()
