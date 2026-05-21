@@ -323,12 +323,20 @@ def get_auto_sign_in_code(account_email, account_password):
 
             # Change language to English
             try:
-                page.get_by_text("简体中文").click(timeout=5000)
-                page.get_by_text("English").click(timeout=5000)
-                page.wait_for_timeout(1500)
+                page.wait_for_timeout(2000)
+            
+                # click top-right language dropdown
+                page.mouse.click(1325, 20)
+                page.wait_for_timeout(1000)
+                debug_shot("2_language_dropdown")
+            
+                # click English option in dropdown
+                page.mouse.click(1295, 150)
+                page.wait_for_timeout(2500)
+                debug_shot("2_language_changed")
+            
             except Exception:
-                pass
-            debug_shot("2_language")
+                debug_shot("2_language_failed")
 
             # Fill email----password
             page.locator("input").first.fill(query_text)
