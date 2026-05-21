@@ -282,7 +282,94 @@ def redeem():
         code=code,
         error=error
     )
-    
+
+# ---------------- OUTLOOK SIGN IN CODE ----------------#
+def get_auto_sign_in_code(account_email, account_password):
+    query_text = f"{account_email.strip()}----{account_password.strip()}"
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-blink-features=AutomationControlled"
+                ]
+            )
+
+            context = browser.new_context(
+                viewport={"width": 1400, "height": 900},
+                locale="en-US"
+            )
+
+            page = context.new_page()
+            page.set_default_timeout(45000)
+
+            page.goto(
+                "https://yz.naifei.store/#/login",
+                wait_until="networkidle",
+                timeout=90000
+            )
+
+            # Change language to English
+            try:
+                page.get_by_text("简体中文").click(timeout=5000)
+                page.get_by_text("English").click(timeout=5000)
+                page.wait_for_timeout(1500)
+            except Exception:
+                pass
+
+            # Fill email----password
+            page.locator("input").first.fill(query_text)
+
+            # Click Exchange
+            page.get_by_text("Exchange", exact=True).click(timeout=10000)
+
+            page.wait_for_timeout(3000)
+
+            body_text = page.locator("body").inner_text()
+
+            if "We have not received the latest verification code" in body_text:
+                browser.close()
+                return None, "No latest code received. Please make sure you send the sign-in code before attempting to get the code."
+
+            # Click Replace button
+            try:
+                page.get_by_text("Click Replace", exact=True).click(timeout=10000)
+            except Exception:
+                browser.close()
+                return None, "Unable to click replace. Please try again."
+
+            page.wait_for_timeout(2000)
+
+            # Confirm hint popup
+            try:
+                page.get_by_text("OK", exact=True).click(timeout=8000)
+            except Exception:
+                pass
+
+            # Wait for success / no latest code
+            page.wait_for_timeout(8000)
+
+            final_text = page.locator("body").inner_text()
+
+            if "We have not received the latest verification code" in final_text:
+                browser.close()
+                return None, "No latest code received. Please make sure you send the sign-in code before attempting to get the code."
+
+            # Get latest code from modal/table
+            codes = re.findall(r"\b\d{4}\b", final_text)
+
+            browser.close()
+
+            if codes:
+                return codes[0], None
+
+            return None, "No 4-digit code found. Please send the sign-in code first and try again."
+
+    except Exception as e:
+        return None, f"System error: {str(e)}"
 
 # ---------------- HOUSEHOLD CODE ----------------
 def _extract_code_from_verification_link(url: str):
@@ -580,6 +667,28 @@ def outlook_code():
     return render_template(
         "outlook.html",
         email=entered if request.method == "POST" else "",
+        code=code,
+        error=error
+    )
+
+@app.route("/sign-in-code-auto", methods=["GET", "POST"])
+def sign_in_code_auto():
+    code = None
+    error = None
+    entered_email = ""
+
+    if request.method == "POST":
+        entered_email = (request.form.get("email") or "").strip()
+        entered_password = (request.form.get("password") or "").strip()
+
+        if not entered_email or not entered_password:
+            error = "Please enter both email and password."
+        else:
+            code, error = get_auto_sign_in_code(entered_email, entered_password)
+
+    return render_template(
+        "sign_in_auto.html",
+        email=entered_email,
         code=code,
         error=error
     )
