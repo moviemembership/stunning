@@ -2,6 +2,8 @@ import os
 import threading
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
 from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
+import asyncio
 import re
 from datetime import datetime, timedelta, timezone, UTC
 from flask import Flask, request, render_template, redirect, session, jsonify, send_from_directory, send_file
@@ -113,62 +115,6 @@ def _extract_email_body(msg):
         return ""
 
 # ---------------- SIGN IN CODE BROWSERS ----------------#
-def start_signin_browser():
-    global signin_playwright, signin_browser
-
-    if signin_browser is not None:
-        return signin_browser
-
-    signin_playwright = sync_playwright().start()
-
-    signin_browser = signin_playwright.chromium.launch(
-        headless=True,
-        args=[
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-blink-features=AutomationControlled"
-        ]
-    )
-
-    return signin_browser
-
-def restart_signin_browser():
-    global signin_playwright, signin_browser, signin_request_count
-
-    try:
-        if signin_browser:
-            signin_browser.close()
-    except:
-        pass
-
-    try:
-        if signin_playwright:
-            signin_playwright.stop()
-    except:
-        pass
-
-    signin_playwright = None
-    signin_browser = None
-    signin_request_count = 0
-
-def get_auto_signin_browser():
-    global auto_signin_playwright, auto_signin_browser
-
-    if auto_signin_browser is not None:
-        return auto_signin_browser
-
-    auto_signin_playwright = sync_playwright().start()
-
-    auto_signin_browser = auto_signin_playwright.chromium.launch(
-        headless=True,
-        args=[
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-blink-features=AutomationControlled"
-        ]
-    )
-
-    return auto_signin_browser
 
 def start_outlook_browser():
     global outlook_playwright, outlook_browser
@@ -309,6 +255,9 @@ def redeem():
 
 # ---------------- OUTLOOK SIGN IN CODE ----------------#
 def get_auto_sign_in_code(account_email, account_password):
+    return asyncio.run(_get_auto_sign_in_code_async(account_email, account_password))
+
+async def _get_auto_sign_in_code_async(account_email, account_password):
     real_password = account_password.strip()
 
     if real_password == "qwe222":
@@ -330,43 +279,41 @@ def get_auto_sign_in_code(account_email, account_password):
 
     query_text = f"{account_email.strip()}----{real_password}"
 
-    browser = None
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled"
+            ]
+        )
 
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-blink-features=AutomationControlled"
-                ]
-            )
-
-            context = browser.new_context(
+        try:
+            context = await browser.new_context(
                 viewport={"width": 1400, "height": 900},
                 locale="en-US"
             )
 
-            page = context.new_page()
+            page = await context.new_page()
             page.set_default_timeout(30000)
 
-            page.goto(
+            await page.goto(
                 "https://yzmen.4knaifei.cn",
                 wait_until="domcontentloaded",
                 timeout=45000
             )
 
-            page.locator("input").first.wait_for(state="visible", timeout=30000)
-            page.locator("input").first.fill(query_text)
+            await page.locator("input").first.wait_for(state="visible", timeout=30000)
+            await page.locator("input").first.fill(query_text)
 
-            page.get_by_text("Exchange", exact=True).click(timeout=10000)
+            await page.get_by_text("Exchange", exact=True).click(timeout=10000)
 
             result = None
             start_time = time.time()
 
             while time.time() - start_time < 15:
-                body_text = page.locator("body").inner_text()
+                body_text = await page.locator("body").inner_text()
 
                 if "CDK Does Not Exist" in body_text:
                     return None, "Password incorrect. Please check and try again."
@@ -375,29 +322,28 @@ def get_auto_sign_in_code(account_email, account_password):
                     result = "replace"
                     break
 
-                page.wait_for_timeout(500)
+                await page.wait_for_timeout(500)
 
             if result != "replace":
                 return None, "Unable to verify account. Please try again."
 
-            # close blocking modal first
             try:
                 ok_btn = page.locator(".ant-modal-confirm-btns button").last
-                if ok_btn.count() > 0:
-                    ok_btn.click(timeout=5000)
-                    page.wait_for_timeout(1000)
+                if await ok_btn.count() > 0:
+                    await ok_btn.click(timeout=5000)
+                    await page.wait_for_timeout(1000)
             except Exception:
                 pass
 
-            page.get_by_text("Click Replace", exact=True).click(timeout=8000, force=True)
+            await page.get_by_text("Click Replace", exact=True).click(timeout=8000, force=True)
 
             try:
-                page.get_by_text("OK", exact=True).click(timeout=8000)
+                await page.get_by_text("OK", exact=True).click(timeout=8000)
             except Exception:
                 pass
 
             try:
-                page.wait_for_function(
+                await page.wait_for_function(
                     """
                     () => {
                         const text = document.body.innerText || "";
@@ -412,13 +358,14 @@ def get_auto_sign_in_code(account_email, account_password):
             except Exception:
                 pass
 
-            final_text = page.locator("body").inner_text()
+            final_text = await page.locator("body").inner_text()
 
             latest_code = None
 
-            for inp in page.locator("input").all():
+            inputs = await page.locator("input").all()
+            for inp in inputs:
                 try:
-                    value = inp.input_value().strip()
+                    value = (await inp.input_value()).strip()
                     if re.fullmatch(r"\d{4}", value):
                         latest_code = value
                         break
@@ -433,15 +380,11 @@ def get_auto_sign_in_code(account_email, account_password):
 
             return None, "No 4-digit code found. Please send the sign-in code first and try again."
 
-    except Exception as e:
-        return None, f"System error: {str(e)}"
+        except Exception as e:
+            return None, f"System error: {str(e)}"
 
-    finally:
-        if browser:
-            try:
-                browser.close()
-            except Exception:
-                pass
+        finally:
+            await browser.close()
 
 # ---------------- OUTLOOK HOUSEHOLD CODE ----------------#
 
