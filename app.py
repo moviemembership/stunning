@@ -320,7 +320,7 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
             result = None
             start_time = time.time()
 
-            while time.time() - start_time < 15:
+            while time.time() - start_time < 10:
                 body_text = await page.locator("body").inner_text()
 
                 if "CDK Does Not Exist" in body_text:
@@ -361,7 +361,7 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
                         );
                     }
                     """,
-                    timeout=30000
+                    timeout=20000
                 )
             except Exception:
                 pass
