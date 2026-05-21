@@ -305,13 +305,13 @@ def get_auto_sign_in_code(account_email, account_password):
 
             page = context.new_page()
             def debug_shot(name):
-            try:
-                page.screenshot(
-                    path=f"/tmp/{name}.png",
-                    full_page=True
-                )
-            except:
-                pass
+                try:
+                    page.screenshot(
+                        path=f"/tmp/{name}.png",
+                        full_page=True
+                    )
+                except:
+                    pass
             page.set_default_timeout(45000)
 
             page.goto(
