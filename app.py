@@ -355,12 +355,31 @@ def get_auto_sign_in_code(account_email, account_password):
 
             # Click Exchange
             page.get_by_text("Exchange", exact=True).click(timeout=10000)
-
-            # Wait for Click Replace button
-            page.get_by_text("Click Replace", exact=True).wait_for(
-                state="visible",
-                timeout=15000
-            )
+            
+            result = None
+            start_time = time.time()
+            
+            while time.time() - start_time < 15:
+            
+                body_text = page.locator("body").inner_text()
+            
+                # Wrong password/CDK
+                if "CDK Does Not Exist" in body_text:
+                    return None, "Password incorrect. Please check and try again."
+            
+                # Success
+                if "Click Replace" in body_text:
+                    result = "replace"
+                    break
+            
+                page.wait_for_timeout(500)
+            
+            # If no result after waiting
+            if result != "replace":
+                return None, "Unable to verify account. Please try again."
+            
+            # Click Replace
+            page.get_by_text("Click Replace", exact=True).click(timeout=8000)
 
             # Click Replace
             page.get_by_text("Click Replace", exact=True).click(timeout=8000)
