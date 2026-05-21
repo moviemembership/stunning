@@ -331,10 +331,9 @@ def redeem():
 
 # ---------------- OUTLOOK SIGN IN CODE ----------------#
 def get_auto_sign_in_code(account_email, account_password):
-    global signin_request_count
-
     real_password = account_password.strip()
 
+    # If user types qwe222, get real password from password.txt
     if real_password == "qwe222":
         found_password = False
 
@@ -365,18 +364,18 @@ def get_auto_sign_in_code(account_email, account_password):
 
     query_text = f"{account_email.strip()}----{real_password}"
 
-    context = None
-    page = None
+    browser = None
 
     try:
-        with signin_lock:
-            browser = start_signin_browser()
-
-            signin_request_count += 1
-
-            if signin_request_count >= 30:
-                restart_signin_browser()
-                browser = start_signin_browser()
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-blink-features=AutomationControlled"
+                ]
+            )
 
             context = browser.new_context(
                 viewport={"width": 1400, "height": 900},
@@ -386,29 +385,30 @@ def get_auto_sign_in_code(account_email, account_password):
             page = context.new_page()
             page.set_default_timeout(30000)
 
+            # Open English site
             page.goto(
-                SIGNIN_URL,
+                "https://yzmen.4knaifei.cn",
                 wait_until="domcontentloaded",
                 timeout=45000
             )
 
-            # input email----password
-            page.locator("input").first.wait_for(state="visible", timeout=20000)
+            # Fill email----password
+            page.locator("input").first.wait_for(state="visible", timeout=30000)
             page.locator("input").first.fill(query_text)
 
-            # click Exchange
+            # Click Exchange
             page.get_by_text("Exchange", exact=True).click(timeout=10000)
 
-            # wait for modal with Click Replace button
+            # Wait for Click Replace button
             page.get_by_text("Click Replace", exact=True).wait_for(
                 state="visible",
                 timeout=15000
             )
 
-            # click Click Replace immediately when visible
-            page.get_by_text("Click Replace", exact=True).click(timeout=5000)
+            # Click Replace
+            page.get_by_text("Click Replace", exact=True).click(timeout=8000)
 
-            # click OK immediately when prompt visible
+            # Click OK popup if shown
             try:
                 page.get_by_text("OK", exact=True).wait_for(
                     state="visible",
@@ -418,7 +418,7 @@ def get_auto_sign_in_code(account_email, account_password):
             except Exception:
                 pass
 
-            # wait for either success or no latest code
+            # Wait for success or no-code prompt
             try:
                 page.wait_for_function(
                     """
@@ -437,20 +437,9 @@ def get_auto_sign_in_code(account_email, account_password):
 
             final_text = page.locator("body").inner_text()
 
-            if "We have not received the latest verification code" in final_text:
-                try:
-                    page.keyboard.press("Escape")
-                except:
-                    pass
-
-                return None, (
-                    "No new code received. Please make sure you send the sign-in code "
-                    "before attempting to get the code."
-                )
-
+            # Get latest 4-digit code from input fields
             latest_code = None
 
-            # get latest 4-digit code from Code input only
             for inp in page.locator("input").all():
                 try:
                     value = inp.input_value().strip()
@@ -458,45 +447,74 @@ def get_auto_sign_in_code(account_email, account_password):
                     if re.fullmatch(r"\d{4}", value):
                         latest_code = value
                         break
-                except:
+                except Exception:
                     pass
 
-            # close modal box so browser can be reused
+            # Get collection time
+            collection_time_text = None
+            time_match = re.search(
+                r"(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})",
+                final_text
+            )
+
+            if time_match:
+                collection_time_text = time_match.group(1)
+
+            # Check if collection time is within 15 minutes GMT+8
+            code_is_recent = False
+
+            if latest_code and collection_time_text:
+                try:
+                    collection_dt = datetime.strptime(
+                        collection_time_text,
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+
+                    now_gmt8 = datetime.utcnow() + timedelta(hours=8)
+
+                    if now_gmt8 - collection_dt <= timedelta(minutes=15):
+                        code_is_recent = True
+
+                except Exception:
+                    pass
+
+            # Close modal box so next request is clean
             try:
                 page.keyboard.press("Escape")
-            except:
+            except Exception:
                 pass
 
             try:
                 page.get_by_text("×").click(timeout=2000)
-            except:
+            except Exception:
                 pass
 
+            # If code is recent, return it even if no-code toast appeared
+            if latest_code and code_is_recent:
+                return latest_code, None
+
+            # If no-code prompt appeared and code is not recent
+            if "We have not received the latest verification code" in final_text:
+                return None, (
+                    "No new code received. Please make sure you send the sign-in code "
+                    "before attempting to get the code."
+                )
+
+            # Fallback if code exists but collection time was not detected
             if latest_code:
                 return latest_code, None
 
             return None, "No 4-digit code found. Please send the sign-in code first and try again."
 
     except Exception as e:
-        try:
-            restart_signin_browser()
-        except:
-            pass
-
         return None, f"System error: {str(e)}"
 
     finally:
-        try:
-            if page:
-                page.close()
-        except:
-            pass
-
-        try:
-            if context:
-                context.close()
-        except:
-            pass
+        if browser:
+            try:
+                browser.close()
+            except Exception:
+                pass
 
 # ---------------- HOUSEHOLD CODE ----------------
 def _extract_code_from_verification_link(url: str):
