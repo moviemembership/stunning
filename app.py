@@ -377,9 +377,6 @@ def get_auto_sign_in_code(account_email, account_password):
             # If no result after waiting
             if result != "replace":
                 return None, "Unable to verify account. Please try again."
-            
-            # Click Replace
-            page.get_by_text("Click Replace", exact=True).click(timeout=8000)
 
             # Click Replace
             page.get_by_text("Click Replace", exact=True).click(timeout=8000)
