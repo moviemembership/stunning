@@ -304,49 +304,23 @@ def get_auto_sign_in_code(account_email, account_password):
             )
 
             page = context.new_page()
-            def debug_shot(name):
-                try:
-                    page.screenshot(
-                        path=f"/tmp/{name}.png",
-                        full_page=True
-                    )
-                except:
-                    pass
             page.set_default_timeout(45000)
 
             page.goto(
-                "https://yz.naifei.store/#/login",
+                "https://yzm.4knaifei.cn/#/login",
                 wait_until="networkidle",
                 timeout=90000
             )
-            debug_shot("1_loaded")
-
-            # Change language to English
-            try:
-                page.wait_for_timeout(2000)
-            
-                # click top-right language dropdown
-                page.mouse.click(1325, 20)
-                page.wait_for_timeout(1000)
-                debug_shot("2_language_dropdown")
-            
-                # click English option in dropdown
-                page.mouse.click(1295, 150)
-                page.wait_for_timeout(2500)
-                debug_shot("2_language_changed")
-            
-            except Exception:
-                debug_shot("2_language_failed")
-
-            # Fill email----password
-            page.locator("input").first.fill(query_text)
-            debug_shot("3_filled")
-
-            # Click Exchange
-            page.get_by_text("Exchange", exact=True).click(timeout=10000)
-            debug_shot("4_exchange_clicked")
 
             page.wait_for_timeout(3000)
+
+            # fill email----password
+            page.locator("input").first.fill(query_text)
+
+            # click exchange/search button
+            page.locator("button").first.click(timeout=10000)
+
+            page.wait_for_timeout(4000)
 
             body_text = page.locator("body").inner_text()
 
@@ -354,42 +328,47 @@ def get_auto_sign_in_code(account_email, account_password):
                 browser.close()
                 return None, "No latest code received. Please make sure you send the sign-in code before attempting to get the code."
 
-            # Click Replace button
+            # click Click Replace
             try:
                 page.get_by_text("Click Replace", exact=True).click(timeout=10000)
             except Exception:
-                browser.close()
-                return None, "Unable to click replace. Please try again."
+                # fallback if language is Chinese/boxes
+                page.locator("button").last.click(timeout=10000)
 
             page.wait_for_timeout(2000)
-            debug_shot("5_replace_clicked")
 
-            # Confirm hint popup
+            # click OK popup
             try:
-                page.get_by_text("OK", exact=True).click(timeout=8000)
+                page.get_by_text("OK", exact=True).click(timeout=10000)
             except Exception:
                 pass
-            debug_shot("6_ok_clicked")
 
-            # Wait for success / no latest code
             page.wait_for_timeout(8000)
 
             final_text = page.locator("body").inner_text()
 
             if "We have not received the latest verification code" in final_text:
                 browser.close()
-                return None, "No latest code received. Please make sure you send the sign-in code before attempting to get the code."
-            debug_shot("7_final")
+                return None, "No new code received. Please send the Netflix sign-in code first before trying again."
 
-            # Get latest code from modal/table
-            codes = re.findall(r"\b\d{4}\b", final_text)
+            # get code from Code input only, not from date/year
+            code_inputs = page.locator("input").all()
+
+            latest_code = None
+
+            for inp in code_inputs:
+                value = inp.input_value().strip()
+
+                if re.fullmatch(r"\d{4}", value):
+                    latest_code = value
+                    break
 
             browser.close()
 
-            if codes:
-                return codes[0], None
+            if latest_code:
+                return latest_code, None
 
-            return None, "No 4-digit code found. Please send the sign-in code first and try again."
+            return None, "No 4-digit code found."
 
     except Exception as e:
         return None, f"System error: {str(e)}"
