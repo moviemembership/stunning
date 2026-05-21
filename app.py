@@ -3,7 +3,7 @@ os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
 from playwright.sync_api import sync_playwright
 import re
 from datetime import datetime, timedelta, timezone, UTC
-from flask import Flask, request, render_template, redirect, session, jsonify, send_from_directory
+from flask import Flask, request, render_template, redirect, session, jsonify, send_from_directory, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 from email_validator import validate_email, EmailNotValidError
 import smtplib, ssl, secrets, time
@@ -304,6 +304,14 @@ def get_auto_sign_in_code(account_email, account_password):
             )
 
             page = context.new_page()
+            def debug_shot(name):
+            try:
+                page.screenshot(
+                    path=f"/tmp/{name}.png",
+                    full_page=True
+                )
+            except:
+                pass
             page.set_default_timeout(45000)
 
             page.goto(
@@ -311,6 +319,7 @@ def get_auto_sign_in_code(account_email, account_password):
                 wait_until="networkidle",
                 timeout=90000
             )
+            debug_shot("1_loaded")
 
             # Change language to English
             try:
@@ -319,12 +328,15 @@ def get_auto_sign_in_code(account_email, account_password):
                 page.wait_for_timeout(1500)
             except Exception:
                 pass
+            debug_shot("2_language")
 
             # Fill email----password
             page.locator("input").first.fill(query_text)
+            debug_shot("3_filled")
 
             # Click Exchange
             page.get_by_text("Exchange", exact=True).click(timeout=10000)
+            debug_shot("4_exchange_clicked")
 
             page.wait_for_timeout(3000)
 
@@ -342,12 +354,14 @@ def get_auto_sign_in_code(account_email, account_password):
                 return None, "Unable to click replace. Please try again."
 
             page.wait_for_timeout(2000)
+            debug_shot("5_replace_clicked")
 
             # Confirm hint popup
             try:
                 page.get_by_text("OK", exact=True).click(timeout=8000)
             except Exception:
                 pass
+            debug_shot("6_ok_clicked")
 
             # Wait for success / no latest code
             page.wait_for_timeout(8000)
@@ -357,6 +371,7 @@ def get_auto_sign_in_code(account_email, account_password):
             if "We have not received the latest verification code" in final_text:
                 browser.close()
                 return None, "No latest code received. Please make sure you send the sign-in code before attempting to get the code."
+            debug_shot("7_final")
 
             # Get latest code from modal/table
             codes = re.findall(r"\b\d{4}\b", final_text)
@@ -692,6 +707,13 @@ def sign_in_code_auto():
         code=code,
         error=error
     )
+
+@app.route("/debug/<name>")
+def debug_image(name):
+    try:
+        return send_file(f"/tmp/{name}.png", mimetype="image/png")
+    except Exception as e:
+        return f"Debug image not found: {str(e)}"
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
