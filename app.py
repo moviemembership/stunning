@@ -346,25 +346,32 @@ def get_auto_sign_in_code(account_email, account_password):
 
     query_text = f"{account_email.strip()}----{real_password}"
 
-    with auto_signin_lock:
-        context = None
-    
-        try:
-            browser = get_auto_signin_browser()
-    
+    browser = None
+    context = None
+
+    try:
+        with sync_playwright() as p:
+
+            browser = p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-blink-features=AutomationControlled"
+                ]
+            )
+
             context = browser.new_context(
                 viewport={"width": 1400, "height": 900},
                 locale="en-US"
             )
-    
-            page = context.new_page()
-            page.set_default_timeout(30000)
 
-            # Open English site
+            page = context.new_page()
+
             page.goto(
-                "https://yzmen.4knaifei.cn",
+                AUTO_SIGNIN_URL,
                 wait_until="domcontentloaded",
-                timeout=45000
+                timeout=60000
             )
 
             # Fill email----password
@@ -504,7 +511,13 @@ def get_auto_sign_in_code(account_email, account_password):
             try:
                 if context:
                     context.close()
-            except Exception:
+            except:
+                pass
+    
+            try:
+                if browser:
+                    browser.close()
+            except:
                 pass
 
 # ---------------- OUTLOOK HOUSEHOLD CODE ----------------#
