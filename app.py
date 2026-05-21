@@ -488,14 +488,14 @@ def get_auto_sign_in_code(account_email, account_password):
 
             return None, "No 4-digit code found. Please send the sign-in code first and try again."
 
-    except Exception as e:
-        return None, f"System error: {str(e)}"
+        except Exception as e:
+            return None, f"System error: {str(e)}"
 
-    finally:
-        try:
-            context.close()
-        except Exception:
-            pass
+        finally:
+            try:
+                context.close()
+            except Exception:
+                pass
 
 # ---------------- OUTLOOK HOUSEHOLD CODE ----------------#
 
