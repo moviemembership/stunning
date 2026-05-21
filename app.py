@@ -504,21 +504,21 @@ def get_auto_sign_in_code(account_email, account_password):
 
             return None, "No 4-digit code found. Please send the sign-in code first and try again."
 
-        except Exception as e:
-            return None, f"System error: {str(e)}"
+    except Exception as e:
+        return None, f"System error: {str(e)}"
     
-        finally:
-            try:
-                if context:
-                    context.close()
-            except:
-                pass
+    finally:
+        try:
+            if context:
+                context.close()
+        except:
+            pass
     
-            try:
-                if browser:
-                    browser.close()
-            except:
-                pass
+        try:
+            if browser:
+                browser.close()
+        except:
+            pass
 
 # ---------------- OUTLOOK HOUSEHOLD CODE ----------------#
 
