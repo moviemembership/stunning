@@ -32,6 +32,21 @@ signin_request_count = 0
 
 OUTLOOK_URL = "https://yz.naifei.store/#/login"
 
+AUTO_SIGNIN_URL = "https://yzmen.4knaifei.cn"
+
+auto_signin_playwright = sync_playwright().start()
+
+auto_signin_browser = auto_signin_playwright.chromium.launch(
+    headless=True,
+    args=[
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-blink-features=AutomationControlled"
+    ]
+)
+
+auto_signin_lock = threading.Lock()
+
 outlook_playwright = None
 outlook_browser = None
 outlook_lock = threading.Lock()
@@ -323,17 +338,11 @@ def get_auto_sign_in_code(account_email, account_password):
 
     browser = None
 
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-blink-features=AutomationControlled"
-                ]
-            )
+    with auto_signin_lock:
 
+        try:
+            browser = auto_signin_browser
+    
             context = browser.new_context(
                 viewport={"width": 1400, "height": 900},
                 locale="en-US"
@@ -483,11 +492,10 @@ def get_auto_sign_in_code(account_email, account_password):
         return None, f"System error: {str(e)}"
 
     finally:
-        if browser:
-            try:
-                browser.close()
-            except Exception:
-                pass
+        try:
+            context.close()
+        except Exception:
+            pass
 
 # ---------------- OUTLOOK HOUSEHOLD CODE ----------------#
 
