@@ -16,7 +16,7 @@
       <label class="outlook-label">Account Password:</label>
       <input class="outlook-input" type="text" name="password" placeholder="Enter account password" required>
 
-      <button class="outlook-btn" type="submit">Get Latest Code</button>
+      <button class="outlook-btn" type="submit" id="submitBtn">Get Latest Code</button>
 
       <div class="loading-box" id="loading">
         Checking latest code, please wait...
@@ -154,6 +154,51 @@
 document.getElementById("code-form").addEventListener("submit", function () {
   document.getElementById("loading").style.display = "block";
 });
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const form = document.querySelector("form");
+    const button = document.getElementById("submitBtn");
+
+    form.addEventListener("submit", function () {
+
+        // prevent double click
+        button.disabled = true;
+
+        // change text
+        button.innerText = "Please wait...";
+
+        // optional style
+        button.style.opacity = "0.7";
+        button.style.cursor = "not-allowed";
+    });
+
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const form = document.querySelector("form");
+    const button = document.getElementById("submitBtn");
+
+    // restore button if page reloads from cache
+    button.disabled = false;
+    button.innerText = "Get Latest Code";
+
+    form.addEventListener("submit", function () {
+
+        if (button.disabled) {
+            return false;
+        }
+
+        button.disabled = true;
+        button.innerText = "Please wait...";
+        button.style.opacity = "0.7";
+        button.style.cursor = "not-allowed";
+    });
+
+});
 </script>
+
+
 
 {% endblock %}
