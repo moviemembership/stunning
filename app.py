@@ -285,7 +285,47 @@ def redeem():
 
 # ---------------- OUTLOOK SIGN IN CODE ----------------#
 def get_auto_sign_in_code(account_email, account_password):
-    query_text = f"{account_email.strip()}----{account_password.strip()}"
+    if real_password == "qwe222":
+
+    found_password = False
+
+    try:
+
+        with open("password.txt", "r", encoding="utf-8") as f:
+
+            lines = f.readlines()
+
+            for line in lines:
+
+                line = line.strip()
+
+                if not line:
+                    continue
+
+                parts = re.split(r"\s+", line)
+
+                if len(parts) >= 2:
+
+                    saved_email = parts[0].strip().lower()
+                    saved_password = parts[1].strip()
+
+                    if saved_email == account_email.strip().lower():
+
+                        real_password = saved_password
+                        found_password = True
+                        break
+
+        # NO EMAIL FOUND
+        if not found_password:
+
+            return (
+                None,
+                "Email not updated. Please ask admin to update."
+            )
+
+    except Exception as e:
+
+        return None, f"Unable to read password.txt: {str(e)}"
 
     try:
         with sync_playwright() as p:
