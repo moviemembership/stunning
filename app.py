@@ -30,10 +30,7 @@ ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
 
 playwright_instance = None
-browser = None
-context = None
-page = None
-
+browser_instance = None
 browser_lock = threading.Lock()
 request_count = 0
 # ---------------- FLASK APP ----------------
@@ -295,6 +292,7 @@ def redeem():
 def get_auto_sign_in_code(account_email, account_password):
 
     global request_count
+    global browser_instance
 
     query_text = f"{account_email.strip()}----{account_password.strip()}"
 
@@ -302,128 +300,167 @@ def get_auto_sign_in_code(account_email, account_password):
 
         with browser_lock:
 
-            if browser is None:
+            # start browser if not started
+            if browser_instance is None:
                 start_browser()
 
             request_count += 1
 
-            # restart every 30 requests
+            # restart browser every 30 requests
             if request_count >= 30:
                 restart_browser()
+                start_browser()
 
-            page.goto(
-                "https://yzm.4knaifei.cn/#/login",
-                wait_until="domcontentloaded",
-                timeout=60000
+            # create fresh context/page every request
+            context = browser_instance.new_context(
+                viewport={"width": 1400, "height": 900},
+                locale="en-US"
             )
 
-            # wait small time only
-            page.wait_for_timeout(1000)
+            page = context.new_page()
 
-            # fill account
-            page.locator("input").first.fill(query_text)
+            page.set_default_timeout(45000)
 
-            # click exchange/search
-            page.locator("button").first.click()
+            try:
 
-            # wait popup/result
-            page.wait_for_timeout(1500)
+                # open website
+                page.goto(
+                    "https://yzm.4knaifei.cn/#/login",
+                    wait_until="domcontentloaded",
+                    timeout=60000
+                )
 
-            body_text = page.locator("body").inner_text()
+                page.wait_for_timeout(1000)
 
-            # no latest code
-            if "We have not received the latest verification code" in body_text:
+                # fill email----password
+                page.locator("input").first.fill(query_text)
 
+                # click exchange/search button
+                page.locator("button").first.click()
+
+                page.wait_for_timeout(1500)
+
+                body_text = page.locator("body").inner_text()
+
+                # no latest code yet
+                if "We have not received the latest verification code" in body_text:
+
+                    try:
+                        page.keyboard.press("Escape")
+                    except:
+                        pass
+
+                    return None, (
+                        "No latest code received. "
+                        "Please send the Netflix sign-in code first."
+                    )
+
+                # click replace button
+                try:
+                    page.get_by_text("Click Replace", exact=True).click(timeout=8000)
+
+                except:
+
+                    try:
+                        page.locator("button").nth(3).click(timeout=8000)
+                    except:
+                        return None, "Unable to click replace button."
+
+                page.wait_for_timeout(1000)
+
+                # click OK popup
+                try:
+                    page.get_by_text("OK", exact=True).click(timeout=5000)
+                except:
+                    pass
+
+                # wait until result appears
+                try:
+
+                    page.wait_for_function(
+                        """
+                        () => {
+
+                            const text = document.body.innerText || "";
+
+                            const inputs = Array.from(
+                                document.querySelectorAll("input")
+                            ).map(i => i.value);
+
+                            const hasCode = inputs.some(
+                                v => /^\\d{4}$/.test(v.trim())
+                            );
+
+                            return (
+                                hasCode ||
+                                text.includes("Successfully obtained verification code") ||
+                                text.includes("We have not received the latest verification code")
+                            );
+                        }
+                        """,
+                        timeout=20000
+                    )
+
+                except:
+                    pass
+
+                final_text = page.locator("body").inner_text()
+
+                # still no code
+                if "We have not received the latest verification code" in final_text:
+
+                    try:
+                        page.keyboard.press("Escape")
+                    except:
+                        pass
+
+                    return None, (
+                        "No new code received. "
+                        "Please make sure the sign-in code was sent first."
+                    )
+
+                # get latest 4 digit code
+                latest_code = None
+
+                for inp in page.locator("input").all():
+
+                    try:
+                        value = inp.input_value().strip()
+
+                        if re.fullmatch(r"\d{4}", value):
+                            latest_code = value
+                            break
+
+                    except:
+                        pass
+
+                # close popup/modal
                 try:
                     page.keyboard.press("Escape")
                 except:
                     pass
 
-                return None, (
-                    "No latest code received. "
-                    "Please send the Netflix sign-in code first."
-                )
+                if latest_code:
+                    return latest_code, None
 
-            # click replace
-            try:
-                page.get_by_text("Click Replace", exact=True).click(timeout=8000)
-            except:
-                page.locator("button").nth(3).click(timeout=8000)
+                return None, "No 4-digit code found."
 
-            # wait popup
-            page.wait_for_timeout(1000)
+            finally:
 
-            # click OK popup
-            try:
-                page.get_by_text("OK", exact=True).click(timeout=5000)
-            except:
-                pass
-
-            # dynamic wait instead of fixed long wait
-            try:
-                page.wait_for_function(
-                    """
-                    () => {
-                        const text = document.body.innerText || "";
-                        const inputs = Array.from(document.querySelectorAll("input"))
-                            .map(i => i.value);
-
-                        const hasCode = inputs.some(v => /^\\d{4}$/.test(v.trim()));
-
-                        return hasCode ||
-                               text.includes("Successfully obtained verification code") ||
-                               text.includes("We have not received the latest verification code");
-                    }
-                    """,
-                    timeout=20000
-                )
-            except:
-                pass
-
-            final_text = page.locator("body").inner_text()
-
-            # still no code
-            if "We have not received the latest verification code" in final_text:
-
+                # ALWAYS close page/context
                 try:
-                    page.keyboard.press("Escape")
+                    page.close()
                 except:
                     pass
 
-                return None, (
-                    "No new code received. "
-                    "Please make sure sign-in code was sent first."
-                )
-
-            # get latest code
-            latest_code = None
-
-            for inp in page.locator("input").all():
-
                 try:
-                    value = inp.input_value().strip()
-
-                    if re.fullmatch(r"\d{4}", value):
-                        latest_code = value
-                        break
-
+                    context.close()
                 except:
                     pass
-
-            # CLOSE MODAL FOR NEXT REUSE
-            try:
-                page.keyboard.press("Escape")
-            except:
-                pass
-
-            if latest_code:
-                return latest_code, None
-
-            return None, "No 4-digit code found."
 
     except Exception as e:
 
-        # emergency restart if browser corrupted
+        # restart corrupted browser
         try:
             restart_browser()
         except:
@@ -544,14 +581,11 @@ def household_code():
 
 # ---------------- CHRONIUM BROWSER ----------------
 def start_browser():
-    global playwright_instance, browser, context, page
-
-    if browser:
-        return
+    global playwright_instance, browser_instance
 
     playwright_instance = sync_playwright().start()
 
-    browser = playwright_instance.chromium.launch(
+    browser_instance = playwright_instance.chromium.launch(
         headless=True,
         args=[
             "--no-sandbox",
@@ -560,35 +594,15 @@ def start_browser():
         ]
     )
 
-    context = browser.new_context(
-        viewport={"width": 1400, "height": 900},
-        locale="en-US"
-    )
+    return browser_instance
 
-    page = context.new_page()
-
-    page.set_default_timeout(45000)
-
-    print("Persistent browser started.")
 
 def restart_browser():
-    global playwright_instance, browser, context, page, request_count
+    global playwright_instance, browser_instance, request_count
 
     try:
-        if page:
-            page.close()
-    except:
-        pass
-
-    try:
-        if context:
-            context.close()
-    except:
-        pass
-
-    try:
-        if browser:
-            browser.close()
+        if browser_instance:
+            browser_instance.close()
     except:
         pass
 
@@ -599,16 +613,8 @@ def restart_browser():
         pass
 
     playwright_instance = None
-    browser = None
-    context = None
-    page = None
-
+    browser_instance = None
     request_count = 0
-
-    start_browser()
-
-    print("Browser restarted.")
-
 #---------------------------------------------------
 
 def load_replacements():
