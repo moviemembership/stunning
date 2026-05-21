@@ -1,4 +1,5 @@
 import os
+import threading
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
 from playwright.sync_api import sync_playwright
 import re
@@ -21,6 +22,13 @@ EMAIL_PEEK_TOKEN = os.environ.get("EMAIL_PEEK_TOKEN")
 REPLACEMENT_FILE = os.getenv("REPLACEMENTS_FILE", "/etc/secrets/replacements.txt")
 
 CLICK_COUNT_FILE = os.getenv("CLICK_COUNT_FILE", "/var/data/shopee_clicks.json")
+
+SIGNIN_URL = "https://yzmen.4knaifei.cn"
+
+signin_playwright = None
+signin_browser = None
+signin_lock = threading.Lock()
+signin_request_count = 0
 
 # ---------------- CONFIG ----------------
 
@@ -184,6 +192,44 @@ def get_outlook_household_code(user_email):
     except Exception as e:
         return None, f"System error: {str(e)}"
 
+# ---------------- SIGN IN CODE BROWSERS ----------------#
+def start_signin_browser():
+    global signin_playwright, signin_browser
+
+    if signin_browser is not None:
+        return signin_browser
+
+    signin_playwright = sync_playwright().start()
+
+    signin_browser = signin_playwright.chromium.launch(
+        headless=True,
+        args=[
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-blink-features=AutomationControlled"
+        ]
+    )
+
+    return signin_browser
+
+def restart_signin_browser():
+    global signin_playwright, signin_browser, signin_request_count
+
+    try:
+        if signin_browser:
+            signin_browser.close()
+    except:
+        pass
+
+    try:
+        if signin_playwright:
+            signin_playwright.stop()
+    except:
+        pass
+
+    signin_playwright = None
+    signin_browser = None
+    signin_request_count = 0
 # ---------------- HOME ----------------
 @app.route("/")
 def index():
@@ -285,16 +331,16 @@ def redeem():
 
 # ---------------- OUTLOOK SIGN IN CODE ----------------#
 def get_auto_sign_in_code(account_email, account_password):
-    real_password = account_password.strip()
-    if real_password == "qwe222":
+    global signin_request_count
 
+    real_password = account_password.strip()
+
+    if real_password == "qwe222":
         found_password = False
-    
+
         try:
             with open("password.txt", "r", encoding="utf-8") as f:
-                lines = f.readlines()
-
-                for line in lines:
+                for line in f:
                     line = line.strip()
 
                     if not line:
@@ -319,16 +365,18 @@ def get_auto_sign_in_code(account_email, account_password):
 
     query_text = f"{account_email.strip()}----{real_password}"
 
+    context = None
+    page = None
+
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-blink-features=AutomationControlled"
-                ]
-            )
+        with signin_lock:
+            browser = start_signin_browser()
+
+            signin_request_count += 1
+
+            if signin_request_count >= 30:
+                restart_signin_browser()
+                browser = start_signin_browser()
 
             context = browser.new_context(
                 viewport={"width": 1400, "height": 900},
@@ -336,74 +384,119 @@ def get_auto_sign_in_code(account_email, account_password):
             )
 
             page = context.new_page()
-            page.set_default_timeout(45000)
+            page.set_default_timeout(30000)
 
             page.goto(
-                "https://yzm.4knaifei.cn/#/login",
-                wait_until="networkidle",
-                timeout=90000
+                SIGNIN_URL,
+                wait_until="domcontentloaded",
+                timeout=45000
             )
 
-            page.wait_for_timeout(3000)
-
-            # fill email----password
+            # input email----password
+            page.locator("input").first.wait_for(state="visible", timeout=20000)
             page.locator("input").first.fill(query_text)
 
-            # click exchange/search button
-            page.locator("button").first.click(timeout=10000)
+            # click Exchange
+            page.get_by_text("Exchange", exact=True).click(timeout=10000)
 
-            page.wait_for_timeout(4000)
+            # wait for modal with Click Replace button
+            page.get_by_text("Click Replace", exact=True).wait_for(
+                state="visible",
+                timeout=15000
+            )
 
-            body_text = page.locator("body").inner_text()
+            # click Click Replace immediately when visible
+            page.get_by_text("Click Replace", exact=True).click(timeout=5000)
 
-            if "We have not received the latest verification code" in body_text:
-                browser.close()
-                return None, "No latest code received. Please make sure you send the sign-in code before attempting to get the code."
-
-            # click Click Replace
+            # click OK immediately when prompt visible
             try:
-                page.get_by_text("Click Replace", exact=True).click(timeout=10000)
-            except Exception:
-                # fallback if language is Chinese/boxes
-                page.locator("button").last.click(timeout=10000)
-
-            page.wait_for_timeout(2000)
-
-            # click OK popup
-            try:
-                page.get_by_text("OK", exact=True).click(timeout=10000)
+                page.get_by_text("OK", exact=True).wait_for(
+                    state="visible",
+                    timeout=8000
+                )
+                page.get_by_text("OK", exact=True).click(timeout=5000)
             except Exception:
                 pass
 
-            page.wait_for_timeout(8000)
+            # wait for either success or no latest code
+            try:
+                page.wait_for_function(
+                    """
+                    () => {
+                        const text = document.body.innerText || "";
+                        return (
+                            text.includes("Successfully obtained verification code") ||
+                            text.includes("We have not received the latest verification code")
+                        );
+                    }
+                    """,
+                    timeout=30000
+                )
+            except Exception:
+                pass
 
             final_text = page.locator("body").inner_text()
 
             if "We have not received the latest verification code" in final_text:
-                browser.close()
-                return None, "No new code received. Please send the Netflix sign-in code first before trying again."
+                try:
+                    page.keyboard.press("Escape")
+                except:
+                    pass
 
-            # get code from Code input only, not from date/year
-            code_inputs = page.locator("input").all()
+                return None, (
+                    "No new code received. Please make sure you send the sign-in code "
+                    "before attempting to get the code."
+                )
 
             latest_code = None
 
-            for inp in code_inputs:
-                value = inp.input_value().strip()
+            # get latest 4-digit code from Code input only
+            for inp in page.locator("input").all():
+                try:
+                    value = inp.input_value().strip()
 
-                if re.fullmatch(r"\d{4}", value):
-                    latest_code = value
-                    break
+                    if re.fullmatch(r"\d{4}", value):
+                        latest_code = value
+                        break
+                except:
+                    pass
 
-            browser.close()
+            # close modal box so browser can be reused
+            try:
+                page.keyboard.press("Escape")
+            except:
+                pass
+
+            try:
+                page.get_by_text("×").click(timeout=2000)
+            except:
+                pass
 
             if latest_code:
                 return latest_code, None
 
-            return None, "No 4-digit code found."
+            return None, "No 4-digit code found. Please send the sign-in code first and try again."
 
     except Exception as e:
+        try:
+            restart_signin_browser()
+        except:
+            pass
+
         return None, f"System error: {str(e)}"
+
+    finally:
+        try:
+            if page:
+                page.close()
+        except:
+            pass
+
+        try:
+            if context:
+                context.close()
+        except:
+            pass
 
 # ---------------- HOUSEHOLD CODE ----------------
 def _extract_code_from_verification_link(url: str):
