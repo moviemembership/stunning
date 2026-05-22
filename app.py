@@ -593,8 +593,10 @@ async def _get_verification_code_async(account_email, account_password):
             # Backup: search visible page text for 6 digits only
             if not latest_code:
                 match = re.search(r"\b\d{6}\b", final_text)
-                if match:
-                    latest_code = match.group(0)
+                for m in matches:
+                    if m != real_password:
+                        latest_code = m
+                        break
 
             if latest_code:
                 return latest_code, None
