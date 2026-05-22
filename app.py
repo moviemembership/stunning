@@ -928,6 +928,7 @@ def sign_in_code_auto():
     return render_template(
         "sign_in_auto.html",
         email=entered_email,
+        password=entered_password,
         code=code,
         error=error
     )
@@ -957,6 +958,7 @@ def verification_code():
     return render_template(
         "verification_code.html",
         email=entered_email,
+        password=entered_password,
         code=code,
         error=error
     )
