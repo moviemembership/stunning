@@ -458,6 +458,158 @@ async def _get_outlook_household_code_async(user_email):
         finally:
             await browser.close()
 
+# ---------------- 6-DIGIT VERIFICATION CODE ----------------
+def get_verification_code(account_email, account_password):
+    return asyncio.run(
+        _get_verification_code_async(account_email, account_password)
+    )
+
+
+async def _get_verification_code_async(account_email, account_password):
+    real_password = account_password.strip()
+
+    # If user types qwe222, get real password from password.txt
+    if real_password == "qwe222":
+        found_password = False
+
+        try:
+            with open("password.txt", "r", encoding="utf-8") as f:
+                for line in f:
+                    parts = re.split(r"\s+", line.strip())
+
+                    if len(parts) >= 2 and parts[0].lower() == account_email.strip().lower():
+                        real_password = parts[1]
+                        found_password = True
+                        break
+
+            if not found_password:
+                return None, "Email not updated. Please ask admin to update."
+
+        except Exception as e:
+            return None, f"Unable to read password.txt: {str(e)}"
+
+    query_text = f"{account_email.strip()}----{real_password}"
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled"
+            ]
+        )
+
+        try:
+            context = await browser.new_context(
+                viewport={"width": 1400, "height": 900},
+                locale="en-US"
+            )
+
+            page = await context.new_page()
+            page.set_default_timeout(30000)
+
+            cdk_value = quote(query_text, safe="")
+            auto_url = f"https://yzmen.4knaifei.cn//#/?cdk={cdk_value}"
+
+            await page.goto(
+                auto_url,
+                wait_until="domcontentloaded",
+                timeout=45000
+            )
+
+            result = None
+            start_time = time.time()
+
+            while time.time() - start_time < 15:
+                body_text = await page.locator("body").inner_text()
+
+                if "CDK Does Not Exist" in body_text:
+                    return None, "Password incorrect. Please check and try again."
+
+                if "Click Replace" in body_text:
+                    result = "replace"
+                    break
+
+                await page.wait_for_timeout(500)
+
+            if result != "replace":
+                return None, "Unable to verify account. Please try again."
+
+            # Close blocking modal first
+            try:
+                ok_btn = page.locator(".ant-modal-confirm-btns button").last
+                if await ok_btn.count() > 0:
+                    await ok_btn.click(timeout=5000)
+                    await page.wait_for_timeout(1000)
+            except Exception:
+                pass
+
+            await page.get_by_text("Click Replace", exact=True).click(
+                timeout=8000,
+                force=True
+            )
+
+            # Click OK popup if shown
+            try:
+                await page.get_by_text("OK", exact=True).click(timeout=8000)
+            except Exception:
+                pass
+
+            # Wait for success / no-code prompt
+            try:
+                await page.wait_for_function(
+                    """
+                    () => {
+                        const text = document.body.innerText || "";
+                        return (
+                            text.includes("Successfully obtained verification code") ||
+                            text.includes("We have not received the latest verification code")
+                        );
+                    }
+                    """,
+                    timeout=30000
+                )
+            except Exception:
+                pass
+
+            final_text = await page.locator("body").inner_text()
+
+            latest_code = None
+
+            # ✅ Only accept 6-digit code
+            inputs = await page.locator("input").all()
+            for inp in inputs:
+                try:
+                    value = (await inp.input_value()).strip()
+
+                    if re.fullmatch(r"\d{6}", value):
+                        latest_code = value
+                        break
+
+                except Exception:
+                    pass
+
+            # Backup: search visible page text for 6 digits only
+            if not latest_code:
+                match = re.search(r"\b\d{6}\b", final_text)
+                if match:
+                    latest_code = match.group(0)
+
+            if latest_code:
+                return latest_code, None
+
+            if "We have not received the latest verification code" in final_text:
+                return None, "No new verification code received. Please send the verification code first."
+
+            return None, "No 6-digit verification code found. Please send the verification code first and try again."
+
+        except Exception as e:
+            return None, f"System error: {str(e)}"
+
+        finally:
+            await browser.close()
+
 # ---------------- HOUSEHOLD CODE ----------------
 def _extract_code_from_verification_link(url: str):
     """Follow Netflix 'Temporary Access Code' link and get the OTP."""
@@ -775,6 +927,35 @@ def sign_in_code_auto():
 
     return render_template(
         "sign_in_auto.html",
+        email=entered_email,
+        code=code,
+        error=error
+    )
+
+@app.route("/verification-code", methods=["GET", "POST"])
+def verification_code():
+    code = None
+    error = None
+    entered_email = ""
+
+    if request.method == "POST":
+        entered_email = (request.form.get("email") or "").strip()
+        entered_password = (request.form.get("password") or "").strip()
+
+        if not entered_email or not entered_password:
+            error = "Please enter both email and password."
+        else:
+            try:
+                code, error = get_verification_code(
+                    entered_email,
+                    entered_password
+                )
+            except Exception as e:
+                print("VERIFICATION ERROR:", str(e))
+                error = "System is busy or timed out. Please try again."
+
+    return render_template(
+        "verification_code.html",
         email=entered_email,
         code=code,
         error=error
