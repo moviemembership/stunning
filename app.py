@@ -915,6 +915,7 @@ def sign_in_code_auto():
     code = None
     error = None
     entered_email = ""
+    entered_password = ""
 
     if request.method == "POST":
         entered_email = (request.form.get("email") or "").strip()
@@ -938,6 +939,7 @@ def verification_code():
     code = None
     error = None
     entered_email = ""
+    entered_password = ""
 
     if request.method == "POST":
         entered_email = (request.form.get("email") or "").strip()
