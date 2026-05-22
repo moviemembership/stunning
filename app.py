@@ -577,26 +577,40 @@ async def _get_verification_code_async(account_email, account_password):
 
             latest_code = None
 
-            # ✅ Only accept 6-digit code
-            inputs = await page.locator("input").all()
-            for inp in inputs:
-                try:
-                    value = (await inp.input_value()).strip()
-
-                    if re.fullmatch(r"\d{6}", value):
-                        latest_code = value
-                        break
-
-                except Exception:
-                    pass
+            # Try getting code input specifically
+            try:
+                code_inputs = await page.locator("input").all()
+            
+                for inp in code_inputs:
+                    try:
+                        value = (await inp.input_value()).strip()
+            
+                        if (
+                            re.fullmatch(r"\d{6}", value)
+                            and value != real_password
+                        ):
+                            latest_code = value
+                            break
+            
+                    except Exception:
+                        pass
+            
+            except Exception:
+                pass
 
             # Backup: search visible page text for 6 digits only
             if not latest_code:
-                match = re.search(r"\b\d{6}\b", final_text)
+            
+                matches = re.findall(r"\b\d{6}\b", final_text)
+            
                 for m in matches:
-                    if m != real_password:
-                        latest_code = m
-                        break
+            
+                    # ignore password
+                    if m == real_password:
+                        continue
+            
+                    latest_code = m
+                    break
 
             if latest_code:
                 return latest_code, None
