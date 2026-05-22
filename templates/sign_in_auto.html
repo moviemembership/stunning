@@ -11,10 +11,16 @@
     <form method="POST" id="code-form">
 
       <label class="outlook-label">Account Email:</label>
-      <input class="outlook-input" type="email" name="email" placeholder="example@hotmail.com" required>
+      <input class="outlook-input" type="email" name="email"
+       placeholder="example@hotmail.com"
+       value="{{ email or '' }}"
+       required>
 
       <label class="outlook-label">Account Password:</label>
-      <input class="outlook-input" type="text" name="password" placeholder="Enter account password" required>
+      <input class="outlook-input" type="text" name="password"
+       placeholder="Enter account password"
+       value="{{ password or '' }}"
+       required>
 
       <button class="outlook-btn" type="submit" id="submitBtn">Get Latest Code</button>
 
