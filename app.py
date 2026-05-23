@@ -477,7 +477,10 @@ async def _get_verification_code_async(account_email, account_password):
                 for line in f:
                     parts = re.split(r"\s+", line.strip())
 
-                    if len(parts) >= 2 and parts[0].lower() == account_email.strip().lower():
+                    if (
+                        len(parts) >= 2
+                        and parts[0].lower() == account_email.strip().lower()
+                    ):
                         real_password = parts[1]
                         found_password = True
                         break
@@ -518,6 +521,7 @@ async def _get_verification_code_async(account_email, account_password):
                 timeout=45000
             )
 
+            # Wait until account opens and Click Replace is available
             result = None
             start_time = time.time()
 
@@ -536,96 +540,99 @@ async def _get_verification_code_async(account_email, account_password):
             if result != "replace":
                 return None, "Unable to verify account. Please try again."
 
-            # Close blocking modal first
+            # Close blocking modal first if exists
             try:
                 ok_btn = page.locator(".ant-modal-confirm-btns button").last
                 if await ok_btn.count() > 0:
                     await ok_btn.click(timeout=5000)
-                    await page.wait_for_timeout(1000)
+                    await page.wait_for_timeout(800)
             except Exception:
                 pass
 
-            await page.get_by_text("Click Replace", exact=True).click(
-                timeout=8000,
-                force=True
-            )
+            max_attempts = 5
 
-            # Click OK popup if shown
-            try:
-                await page.get_by_text("OK", exact=True).click(timeout=8000)
-            except Exception:
-                pass
+            for attempt in range(max_attempts):
 
-            # Wait for success / no-code prompt
-            try:
-                await page.wait_for_function(
-                    """
-                    () => {
-                        const text = document.body.innerText || "";
-                        return (
-                            text.includes("Successfully obtained verification code") ||
-                            text.includes("We have not received the latest verification code")
-                        );
-                    }
-                    """,
-                    timeout=30000
+                # Click Replace
+                await page.get_by_text("Click Replace", exact=True).click(
+                    timeout=8000,
+                    force=True
                 )
-            except Exception:
-                pass
 
-            final_text = await page.locator("body").inner_text()
+                # Click OK popup if shown
+                try:
+                    await page.get_by_text("OK", exact=True).click(timeout=8000)
+                except Exception:
+                    pass
 
-            latest_code = None
+                # Wait for result
+                try:
+                    await page.wait_for_function(
+                        """
+                        () => {
+                            const text = document.body.innerText || "";
+                            return (
+                                text.includes("Successfully obtained verification code") ||
+                                text.includes("We have not received the latest verification code")
+                            );
+                        }
+                        """,
+                        timeout=20000
+                    )
+                except Exception:
+                    pass
 
-            # Try getting code input specifically
-            try:
-                code_inputs = await page.locator("input").all()
-            
-                for inp in code_inputs:
+                final_text = await page.locator("body").inner_text()
+
+                # If no verification found
+                if "We have not received the latest verification code" in final_text:
+                    if attempt == 0:
+                        return None, "No 6-digit verification code found."
+                    return None, "No more verification code found."
+
+                latest_code = None
+
+                # Check input fields for 6-digit code, ignoring password
+                inputs = await page.locator("input").all()
+
+                for inp in inputs:
                     try:
                         value = (await inp.input_value()).strip()
-            
+
                         if (
                             re.fullmatch(r"\d{6}", value)
                             and value != real_password
                         ):
                             latest_code = value
                             break
-            
+
                     except Exception:
                         pass
-            
-            except Exception:
-                pass
 
-            # Backup: search visible page text for 6 digits only
-            if not latest_code:
-            
-                matches = re.findall(r"\b\d{6}\b", final_text)
-            
-                for m in matches:
-            
-                    # ignore password
-                    if m == real_password:
-                        continue
-            
-                    latest_code = m
-                    break
+                # Backup: search visible text for 6-digit code, ignoring password
+                if not latest_code:
+                    matches = re.findall(r"\b\d{6}\b", final_text)
 
-            if latest_code:
-                return latest_code, None
+                    for m in matches:
+                        if m == real_password:
+                            continue
 
-            if "We have not received the latest verification code" in final_text:
-                return None, "No new verification code received. Please send the verification code first."
+                        latest_code = m
+                        break
 
-            return None, "No 6-digit verification code found. Please send the verification code first and try again."
+                if latest_code:
+                    return latest_code, None
+
+                # If success happened but code was 4-digit, try next history/code
+                await page.wait_for_timeout(800)
+
+            return None, "No 6-digit verification code found after multiple attempts."
 
         except Exception as e:
             return None, f"System error: {str(e)}"
 
         finally:
             await browser.close()
-
 # ---------------- HOUSEHOLD CODE ----------------
 def _extract_code_from_verification_link(url: str):
     """Follow Netflix 'Temporary Access Code' link and get the OTP."""
