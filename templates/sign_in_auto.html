@@ -25,6 +25,15 @@
       <button class="outlook-btn" type="submit" id="submitBtn">Get Latest Code</button>
 
       <div class="loading-box" id="loading">
+        <div class="progress-wrapper" id="progressWrapper">
+          <div class="progress-bar" id="progressBar">
+            <span id="progressPercent">0%</span>
+          </div>
+        </div>
+        
+        <div class="progress-step" id="progressStep">
+          Preparing...
+        </div>
         Checking latest code, please wait...
       </div>
 
@@ -160,6 +169,39 @@
   cursor: not-allowed;
   pointer-events: none;
 }
+
+  .progress-wrapper {
+  display: none;
+  width: 100%;
+  height: 28px;
+  background: #dbeafe;
+  border: 3px solid #111827;
+  border-radius: 999px;
+  margin-top: 18px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  width: 0%;
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 999px;
+  transition: width 0.6s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.progress-step {
+  display: none;
+  margin-top: 10px;
+  text-align: center;
+  color: #9ca3af;
+  font-weight: 700;
+}
 </style>
 
 <script>
@@ -190,6 +232,61 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 });
+
+  <script>
+document.addEventListener("DOMContentLoaded", function () {
+  const form = document.getElementById("code-form");
+  const button = document.getElementById("submitBtn");
+  const loading = document.getElementById("loading");
+  const progressWrapper = document.getElementById("progressWrapper");
+  const progressBar = document.getElementById("progressBar");
+  const progressPercent = document.getElementById("progressPercent");
+  const progressStep = document.getElementById("progressStep");
+
+  let submitted = false;
+
+  const steps = [
+    { percent: 20, text: "20%." },
+    { percent: 40, text: "40%" },
+    { percent: 60, text: "60%" },
+    { percent: 80, text: "80%" },
+    { percent: 95, text: "95%" }
+  ];
+
+  form.addEventListener("submit", function (e) {
+    if (submitted) {
+      e.preventDefault();
+      return false;
+    }
+
+    submitted = true;
+
+    loading.style.display = "block";
+    progressWrapper.style.display = "block";
+    progressStep.style.display = "block";
+
+    button.disabled = true;
+    button.innerText = "Please wait...";
+    button.style.opacity = "0.6";
+    button.style.cursor = "not-allowed";
+    button.style.pointerEvents = "none";
+
+    let index = 0;
+
+    function updateProgress() {
+      if (index < steps.length) {
+        progressBar.style.width = steps[index].percent + "%";
+        progressPercent.innerText = steps[index].percent + "%";
+        progressStep.innerText = steps[index].text;
+        index++;
+        setTimeout(updateProgress, 6000);
+      }
+    }
+
+    updateProgress();
+  });
+});
+</script>
 </script>
 
 
