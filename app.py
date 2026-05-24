@@ -272,7 +272,7 @@ async def _get_auto_sign_in_code_async(account_email, account_password):
                 body_text = await page.locator("body").inner_text()
 
                 if "CDK Does Not Exist" in body_text:
-                    return None, "Password incorrect. Please check and try again."
+                    return None, "Email or Password incorrect. Please check and try again."
 
                 if "Click Replace" in body_text:
                     result = "replace"
@@ -529,7 +529,7 @@ async def _get_verification_code_async(account_email, account_password):
                 body_text = await page.locator("body").inner_text()
 
                 if "CDK Does Not Exist" in body_text:
-                    return None, "Password incorrect. Please check and try again."
+                    return None, "Email or  Password incorrect. Please check and try again."
 
                 if "Click Replace" in body_text:
                     result = "replace"
