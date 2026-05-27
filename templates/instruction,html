@@ -215,7 +215,19 @@ button,
             <div class="card" onclick="chooseScreenType('tvStyle')">
 
                 <div class="option-img">
-                    TV STYLE IMAGE HERE
+                    <img
+                        src="/test/smarttvsignin.png"
+                        style="
+                            width:100%;
+                            max-width:700px;
+                            aspect-ratio:1/1;
+                            object-fit:cover;
+                            border-radius:18px;
+                            display:block;
+                            margin:20px auto;
+                            border:2px solid #243150;
+                        "
+                    >
                 </div>
 
                 <h2>I am having this screen</h2>
@@ -229,7 +241,19 @@ button,
             <div class="card" onclick="chooseScreenType('phoneStyle')">
 
                 <div class="option-img">
-                    PHONE / TABLET STYLE IMAGE HERE
+                    <img
+                        src="/test/mobile2.png"
+                        style="
+                            width:100%;
+                            max-width:700px;
+                            aspect-ratio:1/1;
+                            object-fit:cover;
+                            border-radius:18px;
+                            display:block;
+                            margin:20px auto;
+                            border:2px solid #243150;
+                        "
+                    >
                 </div>
 
                 <h2>I am having this screen</h2>
@@ -256,7 +280,19 @@ button,
         <h1 id="guideTitle"></h1>
 
         <div class="img">
-            1:1 IMAGE HERE
+            <img
+                        src="/test/mobile1.png"
+                        style="
+                            width:100%;
+                            max-width:700px;
+                            aspect-ratio:1/1;
+                            object-fit:cover;
+                            border-radius:18px;
+                            display:block;
+                            margin:20px auto;
+                            border:2px solid #243150;
+                        "
+                    >
         </div>
 
         <div class="step" id="stepText"></div>
@@ -478,7 +514,19 @@ function showOptions(){
             <a class="card" href="/sign-in-code-auto">
 
                 <div class="option-img">
-                    SIGN-IN CODE IMAGE HERE
+                    <img
+                        src="/test/usesignincode.png"
+                        style="
+                            width:100%;
+                            max-width:700px;
+                            aspect-ratio:1/1;
+                            object-fit:cover;
+                            border-radius:18px;
+                            display:block;
+                            margin:20px auto;
+                            border:2px solid #243150;
+                        "
+                    >
                 </div>
 
                 <h2>Use Sign-In Code</h2>
@@ -492,7 +540,19 @@ function showOptions(){
             <div class="card" onclick="showResult('password')">
 
                 <div class="option-img">
-                    PASSWORD SCREEN IMAGE HERE
+                    <img
+                        src="/test/mobilepassword.png"
+                        style="
+                            width:100%;
+                            max-width:700px;
+                            aspect-ratio:1/1;
+                            object-fit:cover;
+                            border-radius:18px;
+                            display:block;
+                            margin:20px auto;
+                            border:2px solid #243150;
+                        "
+                    >
                 </div>
 
                 <h2>I want to use Password</h2>
@@ -506,7 +566,19 @@ function showOptions(){
             <div class="card" onclick="showResult('wrong')">
 
                 <div class="option-img">
-                    ERROR SCREEN IMAGE HERE
+                    <img
+                        src="/test/mobilesomethingwentwrong.png"
+                        style="
+                            width:100%;
+                            max-width:700px;
+                            aspect-ratio:1/1;
+                            object-fit:cover;
+                            border-radius:18px;
+                            display:block;
+                            margin:20px auto;
+                            border:2px solid #243150;
+                        "
+                    >
                 </div>
 
                 <h2>Something Went Wrong</h2>
@@ -526,7 +598,19 @@ function showOptions(){
             <div class="card" onclick="showResult('qr')">
 
                 <div class="option-img">
-                    QR / TV CODE IMAGE HERE
+                    <img
+                        src="/test/smarttvoption.png"
+                        style="
+                            width:100%;
+                            max-width:700px;
+                            aspect-ratio:1/1;
+                            object-fit:cover;
+                            border-radius:18px;
+                            display:block;
+                            margin:20px auto;
+                            border:2px solid #243150;
+                        "
+                    >
                 </div>
 
                 <h2>I want to use phone to scan QR</h2>
@@ -540,7 +624,19 @@ function showOptions(){
             <div class="card" onclick="showResult('remote')">
 
                 <div class="option-img">
-                    REMOTE LOGIN IMAGE HERE
+                    <img
+                        src="/test/smarttvremote.png"
+                        style="
+                            width:100%;
+                            max-width:700px;
+                            aspect-ratio:1/1;
+                            object-fit:cover;
+                            border-radius:18px;
+                            display:block;
+                            margin:20px auto;
+                            border:2px solid #243150;
+                        "
+                    >
                 </div>
 
                 <h2>I want to use remote sign in</h2>
