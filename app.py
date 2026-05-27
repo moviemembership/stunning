@@ -1001,7 +1001,7 @@ def static_files(filename):
 
 @app.route("/instructions")
 def instructions():
-    render_template("instruction.html")
+    render_template("instructions.html")
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
