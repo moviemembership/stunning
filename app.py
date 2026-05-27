@@ -999,6 +999,10 @@ def debug_image(name):
 def static_files(filename):
     return send_from_directory('test', filename)
 
+@app.route("/instructions")
+def instructions():
+    render_template("instruction.html")
+
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     app.run(debug=True)
