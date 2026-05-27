@@ -995,6 +995,10 @@ def debug_image(name):
     except Exception as e:
         return f"Debug image not found: {str(e)}"
 
+@app.route('/test/<path:filename>')
+def static_files(filename):
+    return send_from_directory('test', filename)
+
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     app.run(debug=True)
