@@ -13,6 +13,28 @@ body{
     color:white;
 }
 
+.image-popup{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.85);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:9999;
+    padding:20px;
+}
+
+.image-popup img{
+    max-width:95%;
+    max-height:95%;
+    border-radius:20px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+}
+
+.image-popup.active{
+    display:flex;
+}
+
 .page{
     max-width:1100px;
     margin:50px auto;
@@ -197,7 +219,10 @@ button,
 
             <div class="card" onclick="chooseScreenType('tvStyle')">
                 <div class="option-img">
-                    <img src="/test/smarttvsignin.png">
+                    <img src="/test/smarttvsignin.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
                 </div>
 
                 <h2>I am having this screen</h2>
@@ -207,7 +232,10 @@ button,
 
             <div class="card" onclick="chooseScreenType('phoneStyle')">
                 <div class="option-img">
-                    <img src="/test/mobile2.png">
+                    <img src="/test/mobile2.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
                 </div>
 
                 <h2>I am having this screen</h2>
@@ -265,6 +293,10 @@ button,
             <button class="prev" onclick="backToOptions()">Previous</button>
         </div>
 
+    </div>
+
+    <div id="imagePopup" class="image-popup" onclick="closePopup()">
+        <img id="popupImage" src="">
     </div>
 
 </div>
@@ -349,7 +381,10 @@ function showStep(){
 
     document.getElementById("stepImage").innerHTML = `
         <div class="img">
-            <img src="${image}">
+            <img src="${image}"
+                onclick="openPopup(this.src)"
+                style="cursor:pointer;"
+            >
         </div>
     `;
 }
@@ -389,7 +424,10 @@ function showOptions(){
         html = `
             <a class="card" href="/sign-in-code-auto">
                 <div class="option-img">
-                    <img src="/test/usesignincode.png">
+                    <img src="/test/usesignincode.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
                 </div>
 
                 <h2>Use Sign-In Code</h2>
@@ -399,7 +437,10 @@ function showOptions(){
 
             <div class="card" onclick="showResult('password')">
                 <div class="option-img">
-                    <img src="/test/mobilepassword.png">
+                    <img src="/test/mobilepassword.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
                 </div>
 
                 <h2>I want to use Password</h2>
@@ -409,7 +450,10 @@ function showOptions(){
 
             <div class="card" onclick="showResult('wrong')">
                 <div class="option-img">
-                    <img src="/test/somethingwentwrong.png">
+                    <img src="/test/somethingwentwrong.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
                 </div>
 
                 <h2>Something Went Wrong</h2>
@@ -421,7 +465,10 @@ function showOptions(){
         html = `
             <div class="card" onclick="showResult('qr')">
                 <div class="option-img">
-                    <img src="/test/smarttvphoneoption.png">
+                    <img src="/test/smarttvphoneoption.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
                 </div>
 
                 <h2>I want to use phone to scan QR</h2>
@@ -431,7 +478,10 @@ function showOptions(){
 
             <div class="card" onclick="showResult('remote')">
                 <div class="option-img">
-                    <img src="/test/smarttvremote.png">
+                    <img src="/test/smarttvremote.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
                 </div>
 
                 <h2>I want to use remote sign in</h2>
@@ -455,7 +505,10 @@ function showResult(type){
 
         document.getElementById("resultImages").innerHTML = `
             <div class="img">
-                <img src="/test/mobilehowtopassword.png">
+                <img src="/test/mobilehowtopassword.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
             </div>
         `;
 
@@ -496,7 +549,10 @@ function showResult(type){
 
         document.getElementById("resultImages").innerHTML = `
             <div class="img">
-                <img src="/test/somethingwentwrong.png">
+                <img src="/test/somethingwentwrong.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
             </div>
         `;
 
@@ -510,7 +566,10 @@ function showResult(type){
 
         document.getElementById("resultImages").innerHTML = `
             <div class="img">
-                <img src="/test/smarttvscanqr.png">
+                <img src="/test/smarttvscanqr.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
             </div>
         `;
 
@@ -534,11 +593,17 @@ function showResult(type){
                 margin-bottom:35px;
             ">
                 <div class="option-img">
-                    <img src="/test/smarttvpassword2.png">
+                    <img src="/test/smarttvpassword2.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
                 </div>
 
                 <div class="option-img">
-                    <img src="/test/smarttvpassword.png">
+                    <img src="/test/smarttvpassword.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
                 </div>
             </div>
         `;
@@ -565,6 +630,22 @@ function backToStep(){
 function backToOptions(){
     hideAll();
     document.getElementById("optionBox").style.display = "block";
+}
+
+function openPopup(src){
+
+    document.getElementById("popupImage").src = src;
+
+    document.getElementById("imagePopup")
+        .classList.add("active");
+
+}
+
+function closePopup(){
+
+    document.getElementById("imagePopup")
+        .classList.remove("active");
+
 }
 </script>
 
