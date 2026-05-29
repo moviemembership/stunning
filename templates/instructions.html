@@ -1,93 +1,298 @@
 {% extends "base.html" %}
+
 {% block content %}
 
+<head>
+<title>Netflix Instruction Guide</title>
+
 <style>
-body{background:#081120;font-family:Arial,sans-serif;margin:0;color:white;}
-.page{max-width:1100px;margin:50px auto;padding:20px;}
-h1{text-align:center;color:#EE4D2D;font-size:42px;}
-p{text-align:center;color:#9ca3af;}
-.progress{text-align:center;color:#9ca3af;font-weight:800;margin-bottom:12px;}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;margin-top:40px;}
-.card{background:#0e162e;border:1px solid #1f2b4a;border-radius:24px;padding:22px;text-align:center;cursor:pointer;transition:.25s;text-decoration:none;color:white;}
-.card:hover{transform:translateY(-8px);border-color:#EE4D2D;box-shadow:0 20px 40px rgba(238,77,45,.25);}
-.icon{font-size:54px;}
-.box{background:#0e162e;border:1px solid #1f2b4a;border-radius:24px;padding:35px;margin-top:30px;display:none;}
-.img,.option-img{width:100%;aspect-ratio:1/1;background:#1f2937;border:2px solid #243150;border-radius:18px;overflow:hidden;margin-bottom:18px;display:flex;align-items:center;justify-content:center;color:#9ca3af;}
-.img{max-width:360px;margin:20px auto;}
-.img img,.option-img img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in;}
-.step{text-align:center;font-size:22px;line-height:1.7;}
-.btnrow{display:flex;justify-content:space-between;margin-top:30px;gap:12px;}
-button,.btn{border:none;border-radius:12px;padding:14px 24px;font-weight:800;cursor:pointer;text-decoration:none;}
-.prev{background:#374151;color:white;}
-.next{background:#EE4D2D;color:white;}
-.image-popup{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:9999;padding:20px;cursor:zoom-out;}
-.image-popup.active{display:flex;}
-.image-popup img{max-width:95%;max-height:95%;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
-@media(max-width:768px){h1{font-size:32px}.step{font-size:18px}.box{padding:24px}}
+body{
+    background:#081120;
+    font-family:Arial,sans-serif;
+    margin:0;
+    color:white;
+}
+
+.image-popup{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.85);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:9999;
+    padding:20px;
+}
+
+.image-popup img{
+    max-width:95%;
+    max-height:95%;
+    border-radius:20px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+}
+
+.image-popup.active{
+    display:flex;
+}
+
+.page{
+    max-width:1100px;
+    margin:50px auto;
+    padding:20px;
+}
+
+h1{
+    text-align:center;
+    color:#EE4D2D;
+    font-size:42px;
+}
+
+p{
+    text-align:center;
+    color:#9ca3af;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+    gap:24px;
+    margin-top:40px;
+}
+
+.card{
+    background:#0e162e;
+    border:1px solid #1f2b4a;
+    border-radius:24px;
+    padding:35px;
+    text-align:center;
+    cursor:pointer;
+    transition:.25s;
+    text-decoration:none;
+    color:white;
+}
+
+.card:hover{
+    transform:translateY(-8px);
+    border-color:#EE4D2D;
+    box-shadow:0 20px 40px rgba(238,77,45,.25);
+}
+
+.icon{
+    font-size:60px;
+}
+
+.box{
+    background:#0e162e;
+    border:1px solid #1f2b4a;
+    border-radius:24px;
+    padding:35px;
+    margin-top:30px;
+    display:none;
+}
+
+.img{
+    width:260px;
+    aspect-ratio:1/1;
+    background:#1f2937;
+    border:2px dashed #4b5563;
+    border-radius:18px;
+    margin:20px auto;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#9ca3af;
+    font-weight:700;
+    text-align:center;
+    overflow:hidden;
+}
+
+.img img,
+.option-img img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    border-radius:16px;
+    display:block;
+}
+
+.step{
+    text-align:center;
+    font-size:22px;
+    line-height:1.7;
+}
+
+.btnrow{
+    display:flex;
+    justify-content:space-between;
+    margin-top:30px;
+    gap:12px;
+}
+
+button,
+.btn{
+    border:none;
+    border-radius:12px;
+    padding:14px 24px;
+    font-weight:800;
+    cursor:pointer;
+    text-decoration:none;
+}
+
+.prev{
+    background:#374151;
+    color:white;
+}
+
+.next{
+    background:#EE4D2D;
+    color:white;
+}
+
+.option-img{
+    width:100%;
+    aspect-ratio:1/1;
+    background:#1f2937;
+    border:2px dashed #4b5563;
+    border-radius:16px;
+    margin-bottom:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#9ca3af;
+    text-align:center;
+    overflow:hidden;
+}
+
+@media(max-width:768px){
+    h1{
+        font-size:32px;
+    }
+
+    .step{
+        font-size:18px;
+    }
+
+    .box{
+        padding:24px;
+    }
+}
 </style>
+</head>
 
 <div class="page">
 
-    <div class="progress" id="progressText">Step 1 of 3</div>
-    <h1 id="mainTitle">What does your Netflix screen look like?</h1>
-    <p id="mainSubtitle">Tap the image that looks closest to your screen.</p>
+    <h1>Choose Your Device</h1>
 
-    <!-- FIRST SCREEN: image-first navigation -->
+    <p>Select your device to continue setup instructions.</p>
+
+    <!-- DEVICE PAGE -->
     <div id="devicePage" class="grid">
 
-        <div class="card" onclick="chooseScreenType('phoneStyle')">
-            <div class="option-img">
-                <img src="/test/mobile2.png" onclick="event.stopPropagation();openPopup(this.src)">
-            </div>
-            <h2>Phone / Tablet / PC Screen</h2>
-            <p>Sign-in code, password, or error screen.</p>
+        <div class="card" onclick="startGuide('phone')">
+            <div class="icon">📱💻</div>
+            <h2>Phone / PC / Laptop</h2>
+            <p>Netflix app or Netflix browser screen</p>
         </div>
 
-        <div class="card" onclick="chooseScreenType('tvStyle')">
-            <div class="option-img">
-                <img src="/test/smarttvsignin.png" onclick="event.stopPropagation();openPopup(this.src)">
+        <div class="card" onclick="startGuide('tv')">
+            <div class="icon">📺</div>
+            <h2>Smart TV</h2>
+            <p>TV screen / QR / remote login screen</p>
+        </div>
+
+        <div class="card" onclick="startGuide('box')">
+            <div class="icon">📦</div>
+            <h2>Android Box / Projector / TV Stick</h2>
+            <p>Some devices show TV screen, some show phone/tablet screen</p>
+        </div>
+
+    </div>
+
+    <!-- SCREEN TYPE -->
+    <div id="screenTypeBox" class="box">
+
+        <h1>Which screen are you having?</h1>
+
+        <p>Please choose the screen that looks most similar to yours.</p>
+
+        <div class="grid">
+
+            <div class="card" onclick="chooseScreenType('tvStyle')">
+                <div class="option-img">
+                    <img src="/test/smarttvsignin.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
+                </div>
+
+                <h2>I am having this screen</h2>
+
+                <p>TV style screen with QR code or remote sign in.</p>
             </div>
-            <h2>TV / QR / Remote Screen</h2>
-            <p>Smart TV, Android Box, Projector, TV Stick.</p>
+
+            <div class="card" onclick="chooseScreenType('phoneStyle')">
+                <div class="option-img">
+                    <img src="/test/mobile2.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
+                </div>
+
+                <h2>I am having this screen</h2>
+
+                <p>Phone/tablet style screen asking for sign in code.</p>
+            </div>
+
+        </div>
+
+        <div class="btnrow">
+            <button class="prev" onclick="backToDevice()">Previous</button>
         </div>
 
     </div>
 
     <!-- STEP BOX -->
     <div id="stepBox" class="box">
-        <div class="progress">Step 2 of 3</div>
+
         <h1 id="guideTitle"></h1>
+
         <div id="stepImage"></div>
+
         <div class="step" id="stepText"></div>
 
         <div class="btnrow">
             <button class="prev" onclick="prevStep()">Previous</button>
             <button class="next" onclick="nextStep()">Next</button>
         </div>
+
     </div>
 
     <!-- OPTION BOX -->
     <div id="optionBox" class="box">
-        <div class="progress">Step 3 of 3</div>
-        <h1>Choose Sign In Method</h1>
-        <p>Tap the option that matches what you want to do.</p>
+
+        <h1>What does your screen show?</h1>
 
         <div class="grid" id="optionGrid"></div>
 
         <div class="btnrow">
             <button class="prev" onclick="backToStep()">Previous</button>
         </div>
+
     </div>
 
     <!-- RESULT BOX -->
     <div id="resultBox" class="box">
+
         <h1 id="resultTitle"></h1>
+
         <div id="resultImages"></div>
+
         <div class="step" id="resultText"></div>
 
         <div class="btnrow">
             <button class="prev" onclick="backToOptions()">Previous</button>
         </div>
+
     </div>
 
     <div id="imagePopup" class="image-popup" onclick="closePopup()">
@@ -97,10 +302,16 @@ button,.btn{border:none;border-radius:12px;padding:14px 24px;font-weight:800;cur
 </div>
 
 <script>
+let device = "";
 let flow = "";
 let step = 0;
 
 const guides = {
+    phoneFlow: [
+        "Open the Netflix app, or open netflix.com/login on your browser.",
+        "Enter your email address and tap Continue."
+    ],
+
     tvFlow: [
         "Open the Netflix app on your TV / TV box / projector / TV stick.",
         "Choose Sign In.",
@@ -109,6 +320,11 @@ const guides = {
 };
 
 const stepImages = {
+    phoneFlow: [
+        "/test/mobile1.png",
+        "/test/mobile2.png"
+    ],
+
     tvFlow: [
         "/test/mobile1.png",
         "/test/smarttvsignin.png",
@@ -118,31 +334,57 @@ const stepImages = {
 
 function hideAll(){
     document.getElementById("devicePage").style.display = "none";
+    document.getElementById("screenTypeBox").style.display = "none";
     document.getElementById("stepBox").style.display = "none";
     document.getElementById("optionBox").style.display = "none";
     document.getElementById("resultBox").style.display = "none";
 }
 
-function chooseScreenType(type){
-    if(type === "phoneStyle"){
+function startGuide(type){
+    device = type;
+
+    if(type === "phone"){
         flow = "phoneFlow";
-        showOptions();
-    } else {
-        flow = "tvFlow";
         step = 0;
         hideAll();
         document.getElementById("stepBox").style.display = "block";
         showStep();
+    } else {
+        hideAll();
+        document.getElementById("screenTypeBox").style.display = "block";
     }
 }
 
+function chooseScreenType(type){
+    if(type === "tvStyle"){
+        flow = "tvFlow";
+    } else {
+        flow = "phoneFlow";
+    }
+
+    step = 0;
+    hideAll();
+    document.getElementById("stepBox").style.display = "block";
+    showStep();
+}
+
 function showStep(){
-    document.getElementById("guideTitle").innerText = "TV Style Setup";
-    document.getElementById("stepText").innerText = guides[flow][step];
+    document.getElementById("guideTitle").innerText =
+        flow === "phoneFlow"
+        ? "Phone / Tablet Style Setup"
+        : "TV Style Setup";
+
+    document.getElementById("stepText").innerText =
+        guides[flow][step];
+
+    const image = stepImages[flow][step];
 
     document.getElementById("stepImage").innerHTML = `
         <div class="img">
-            <img src="${stepImages[flow][step]}" onclick="openPopup(this.src)">
+            <img src="${image}"
+                onclick="openPopup(this.src)"
+                style="cursor:pointer;"
+            >
         </div>
     `;
 }
@@ -161,13 +403,19 @@ function prevStep(){
         step--;
         showStep();
     } else {
-        hideAll();
-        document.getElementById("devicePage").style.display = "grid";
+        if(device === "phone"){
+            hideAll();
+            document.getElementById("devicePage").style.display = "grid";
+        } else {
+            hideAll();
+            document.getElementById("screenTypeBox").style.display = "block";
+        }
     }
 }
 
 function showOptions(){
     hideAll();
+
     document.getElementById("optionBox").style.display = "block";
 
     let html = "";
@@ -175,35 +423,70 @@ function showOptions(){
     if(flow === "phoneFlow"){
         html = `
             <a class="card" href="/sign-in-code-auto">
-                <div class="option-img"><img src="/test/usesignincode.png" onclick="event.preventDefault();openPopup(this.src)"></div>
-                <h2>Sign-In Code</h2>
-                <p>Netflix asks for a 4-digit code.</p>
+                <div class="option-img">
+                    <img src="/test/usesignincode.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
+                </div>
+
+                <h2>Use Sign-In Code</h2>
+
+                <p>Netflix asks for a 4-digit sign-in code.</p>
             </a>
 
             <div class="card" onclick="showResult('password')">
-                <div class="option-img"><img src="/test/mobilepassword.png" onclick="event.stopPropagation();openPopup(this.src)"></div>
-                <h2>Password</h2>
-                <p>Use password instead.</p>
+                <div class="option-img">
+                    <img src="/test/mobilepassword.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
+                </div>
+
+                <h2>I want to use Password</h2>
+
+                <p>Netflix allows password login.</p>
             </div>
 
             <div class="card" onclick="showResult('wrong')">
-                <div class="option-img"><img src="/test/somethingwentwrong.png" onclick="event.stopPropagation();openPopup(this.src)"></div>
-                <h2>Error Screen</h2>
-                <p>Netflix shows something went wrong.</p>
+                <div class="option-img">
+                    <img src="/test/somethingwentwrong.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
+                </div>
+
+                <h2>Something Went Wrong</h2>
+
+                <p>Netflix shows an error screen.</p>
             </div>
         `;
     } else {
         html = `
             <div class="card" onclick="showResult('qr')">
-                <div class="option-img"><img src="/test/smarttvphoneoption.png" onclick="event.stopPropagation();openPopup(this.src)"></div>
-                <h2>Scan QR</h2>
-                <p>Use phone to scan QR code.</p>
+                <div class="option-img">
+                    <img src="/test/smarttvphoneoption.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
+                </div>
+
+                <h2>I want to use phone to scan QR</h2>
+
+                <p>Use your phone camera or browser to sign in.</p>
             </div>
 
             <div class="card" onclick="showResult('remote')">
-                <div class="option-img"><img src="/test/smarttvremote.png" onclick="event.stopPropagation();openPopup(this.src)"></div>
-                <h2>Use Remote</h2>
-                <p>Use TV remote to sign in.</p>
+                <div class="option-img">
+                    <img src="/test/smarttvremote.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
+                </div>
+
+                <h2>I want to use remote sign in</h2>
+
+                <p>Use your TV remote to enter email and password.</p>
             </div>
         `;
     }
@@ -213,41 +496,83 @@ function showOptions(){
 
 function showResult(type){
     hideAll();
+
     document.getElementById("resultBox").style.display = "block";
 
     if(type === "password"){
-        document.getElementById("resultTitle").innerText = "Use Password";
+        document.getElementById("resultTitle").innerText =
+            "Use Password";
+
         document.getElementById("resultImages").innerHTML = `
-            <div class="img"><img src="/test/mobilehowtopassword.png" onclick="openPopup(this.src)"></div>
+            <div class="img">
+                <img src="/test/mobilehowtopassword.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
+            </div>
         `;
+
         document.getElementById("resultText").innerHTML =
             "1. Click <b>Get Help</b>.<br><br>" +
             "2. Click <b>Use Password</b>.<br><br>" +
             "3. Type in your password and sign in.<br><br>" +
-            `<div style="margin-top:35px;text-align:center;">
-                <div style="color:#9ca3af;margin-bottom:18px;font-size:18px;">
+            `
+            <div style="margin-top:40px;text-align:center;">
+                <div style="
+                    color:#9ca3af;
+                    margin-bottom:18px;
+                    font-size:18px;
+                ">
                     After signing in, does Netflix ask you to verify?
                 </div>
-                <a href="/verification-code" style="display:inline-block;background:#EE4D2D;color:white;padding:16px 28px;border-radius:14px;text-decoration:none;font-weight:800;font-size:17px;">
+
+                <a href="/verification-code"
+                   style="
+                        display:inline-block;
+                        background:#EE4D2D;
+                        color:white;
+                        padding:16px 28px;
+                        border-radius:14px;
+                        text-decoration:none;
+                        font-weight:800;
+                        font-size:17px;
+                   ">
                    Yes, It Ask Me To Verify
                 </a>
-            </div>`;
+            </div>
+            `;
     }
 
     if(type === "wrong"){
-        document.getElementById("resultTitle").innerText = "Error Screen";
+        document.getElementById("resultTitle").innerText =
+            "Something Went Wrong";
+
         document.getElementById("resultImages").innerHTML = `
-            <div class="img"><img src="/test/somethingwentwrong.png" onclick="openPopup(this.src)"></div>
+            <div class="img">
+                <img src="/test/somethingwentwrong.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
+            </div>
         `;
+
         document.getElementById("resultText").innerHTML =
-            "Please snap a clear picture of this screen and send it to our customer service.";
+            "Please snap a clear picture of this screen and send it to our customer service for more help.";
     }
 
     if(type === "qr"){
-        document.getElementById("resultTitle").innerText = "Scan QR";
+        document.getElementById("resultTitle").innerText =
+            "Use Phone To Scan QR";
+
         document.getElementById("resultImages").innerHTML = `
-            <div class="img"><img src="/test/smarttvscanqr.png" onclick="openPopup(this.src)"></div>
+            <div class="img">
+                <img src="/test/smarttvscanqr.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
+            </div>
         `;
+
         document.getElementById("resultText").innerHTML =
             "1. Open your phone camera.<br><br>" +
             "2. Scan the QR code shown on your TV.<br><br>" +
@@ -257,13 +582,32 @@ function showResult(type){
     }
 
     if(type === "remote"){
-        document.getElementById("resultTitle").innerText = "Use Remote";
+        document.getElementById("resultTitle").innerText =
+            "Use Remote Sign In";
+
         document.getElementById("resultImages").innerHTML = `
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;margin-bottom:35px;">
-                <div class="option-img"><img src="/test/smarttvpassword2.png" onclick="openPopup(this.src)"></div>
-                <div class="option-img"><img src="/test/smarttvpassword.png" onclick="openPopup(this.src)"></div>
+            <div style="
+                display:grid;
+                grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+                gap:20px;
+                margin-bottom:35px;
+            ">
+                <div class="option-img">
+                    <img src="/test/smarttvpassword2.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
+                </div>
+
+                <div class="option-img">
+                    <img src="/test/smarttvpassword.png"
+                        onclick="openPopup(this.src)"
+                        style="cursor:pointer;"
+                    >
+                </div>
             </div>
         `;
+
         document.getElementById("resultText").innerHTML =
             "1. Use your TV remote to enter the email address.<br><br>" +
             "2. Select <b>Use Remote</b> if needed.<br><br>" +
@@ -273,13 +617,14 @@ function showResult(type){
     }
 }
 
+function backToDevice(){
+    hideAll();
+    document.getElementById("devicePage").style.display = "grid";
+}
+
 function backToStep(){
     hideAll();
-    if(flow === "phoneFlow"){
-        document.getElementById("devicePage").style.display = "grid";
-    } else {
-        document.getElementById("stepBox").style.display = "block";
-    }
+    document.getElementById("stepBox").style.display = "block";
 }
 
 function backToOptions(){
@@ -288,12 +633,19 @@ function backToOptions(){
 }
 
 function openPopup(src){
+
     document.getElementById("popupImage").src = src;
-    document.getElementById("imagePopup").classList.add("active");
+
+    document.getElementById("imagePopup")
+        .classList.add("active");
+
 }
 
 function closePopup(){
-    document.getElementById("imagePopup").classList.remove("active");
+
+    document.getElementById("imagePopup")
+        .classList.remove("active");
+
 }
 </script>
 
