@@ -139,6 +139,21 @@
     filter: brightness(1.05);
     box-shadow: 0 0 18px rgba(238,77,45,.35);
   }
+    .popup-secondary-btn{
+  width:100%;
+  margin-top:10px;
+  padding:12px 14px;
+  border-radius:12px;
+  border:1px solid #243150;
+  background:#111827;
+  color:#e5e7eb;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.popup-secondary-btn:hover{
+  background:#1f2937;
+}
   </style>
 </head>
 <body>
@@ -180,6 +195,10 @@
          rel="noopener noreferrer">
         Join Telegram Now
       </a>
+
+      <button id="popupGetCodeBtn" class="popup-secondary-btn">
+        Get Code
+      </button>
     </div>
   </div>
 </div>
@@ -230,6 +249,7 @@
     const popup = document.getElementById("firstVisitPopup");
     const closeBtn = document.getElementById("popupCloseBtn");
     const shopeeBtn = document.getElementById("popupShopeeBtn");
+    const getCodeBtn = document.getElementById("popupGetCodeBtn");
 
     if(!popup || !closeBtn) return;
 
@@ -269,6 +289,11 @@
         } else {
           fetch("/track/shopee-click", { method: "POST" }).catch(()=>{});
         }
+      });
+    }
+    if (getCodeBtn) {
+      getCodeBtn.addEventListener("click", function(){
+        closePopup();
       });
     }
   })();
