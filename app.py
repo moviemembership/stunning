@@ -583,9 +583,6 @@ async def _get_verification_code_async(account_email, account_password):
                     pass
 
                 final_text = await page.locator("body").inner_text()
-                print("===== PAGE TEXT =====")
-                print(final_text[:5000])
-                print("=====================")
 
                 # If no verification found
                 if "We have not received the latest verification code" in final_text:
