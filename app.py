@@ -583,6 +583,9 @@ async def _get_verification_code_async(account_email, account_password):
                     pass
 
                 final_text = await page.locator("body").inner_text()
+                print("===== PAGE TEXT =====")
+                print(final_text[:5000])
+                print("=====================")
 
                 # If no verification found
                 if "We have not received the latest verification code" in final_text:
@@ -612,11 +615,16 @@ async def _get_verification_code_async(account_email, account_password):
                 # Backup: search visible text for 6-digit code, ignoring password
                 if not latest_code:
                     matches = re.findall(r"\b\d{6}\b", final_text)
-
+                
+                    ignored = {
+                        real_password,
+                        account_password.strip()
+                    }
+                
                     for m in matches:
-                        if m == real_password:
+                        if m in ignored:
                             continue
-
+                
                         latest_code = m
                         break
 
