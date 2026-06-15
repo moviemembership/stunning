@@ -1008,6 +1008,10 @@ def static_files(filename):
 def instructions():
     return render_template("instructions.html")
 
+@app.route("/profile-compare")
+def profile_compare():
+    return render_template("profile_compare.html")
+
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     app.run(debug=True)
