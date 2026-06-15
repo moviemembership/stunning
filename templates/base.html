@@ -176,6 +176,45 @@
   background:#67E8F9;
   box-shadow:0 0 18px rgba(34,211,238,.45);
 }
+.menu-toggle{
+  display:none;
+  background:none;
+  border:none;
+  color:#e5e7eb;
+  font-size:28px;
+  cursor:pointer;
+}
+
+/* Mobile */
+@media (max-width:768px){
+
+  .nav-inner{
+    flex-wrap:wrap;
+  }
+
+  .menu-toggle{
+    display:block;
+  }
+
+  .nav-links{
+    display:none;
+    width:100%;
+    flex-direction:column;
+    gap:0;
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px solid #1f2937;
+  }
+
+  .nav-links.show{
+    display:flex;
+  }
+
+  .nav-links a{
+    padding:12px 0;
+    font-size:16px;
+  }
+}
   </style>
 </head>
 <body>
@@ -183,7 +222,11 @@
   <nav class="nav">
     <div class="container nav-inner">
       <a class="brand" href="/"><span class="brand-dot"></span> <span>Mantapnet</span></a>
-      <div class="nav-links">
+      <button class="menu-toggle" onclick="toggleMenu()">
+        ☰
+    </button>
+    
+    <div class="nav-links" id="mobileMenu">
         <a href="/">Home</a>
         <a href="https://shopee.com.my/vertex_world"
    target="_blank"
@@ -279,6 +322,12 @@
       popup.classList.add("show");
       popup.setAttribute("aria-hidden", "false");
       document.body.style.overflow = "hidden";
+    }
+
+    function toggleMenu(){
+      document
+        .getElementById("mobileMenu")
+        .classList.toggle("show");
     }
 
     function closePopup(){
