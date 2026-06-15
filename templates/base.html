@@ -324,12 +324,6 @@
       document.body.style.overflow = "hidden";
     }
 
-    function toggleMenu(){
-      document
-        .getElementById("mobileMenu")
-        .classList.toggle("show");
-    }
-
     function closePopup(){
       popup.classList.remove("show");
       popup.setAttribute("aria-hidden", "true");
@@ -368,6 +362,11 @@
       });
     }
   })();
+
+    function toggleMenu(){
+      const menu = document.getElementById("mobileMenu");
+      menu.classList.toggle("show");
+    }
   </script>
 </body>
 </html>
