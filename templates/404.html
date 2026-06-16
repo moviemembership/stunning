@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="error-page">
+
+    <div class="error-card">
+
+        <div class="error-code">404</div>
+
+        <h1>Page Not Found</h1>
+
+        <p>
+            The URL you entered is invalid or no longer exists.
+            Please return to the homepage and try again.
+        </p>
+
+        <div class="button-group">
+
+            <a href="/" class="home-btn">
+                Return To Homepage
+            </a>
+
+        </div>
+
+    </div>
+
+</div>
+
+<style>
+
+.error-page{
+    min-height:70vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:30px;
+}
+
+.error-card{
+    max-width:650px;
+    width:100%;
+    text-align:center;
+    background:#0e162e;
+    border:1px solid #1f2b4a;
+    border-radius:24px;
+    padding:50px 35px;
+    box-shadow:0 15px 40px rgba(0,0,0,.35);
+}
+
+.error-code{
+    font-size:100px;
+    font-weight:900;
+    color:#EE4D2D;
+    line-height:1;
+    margin-bottom:10px;
+}
+
+.error-card h1{
+    font-size:38px;
+    margin-bottom:15px;
+    color:white;
+}
+
+.error-card p{
+    color:#9ca3af;
+    font-size:18px;
+    line-height:1.7;
+    margin-bottom:30px;
+}
+
+.home-btn{
+    display:inline-block;
+    background:#EE4D2D;
+    color:white;
+    text-decoration:none;
+    padding:15px 28px;
+    border-radius:14px;
+    font-weight:900;
+    transition:.2s;
+}
+
+.home-btn:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 25px rgba(238,77,45,.35);
+}
+
+@media(max-width:768px){
+
+    .error-code{
+        font-size:70px;
+    }
+
+    .error-card h1{
+        font-size:28px;
+    }
+
+    .error-card p{
+        font-size:16px;
+    }
+
+}
+
+</style>
+
+{% endblock %}
