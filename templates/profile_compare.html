@@ -58,6 +58,32 @@
 </div>
 
 <style>
+@media(max-width:768px){
+
+  .compare-wrapper,
+  .compare-page{
+    padding:12px;
+    overflow:hidden;
+  }
+
+  .compare-card,
+  .compare-table-wrap{
+    overflow-x:auto;
+  }
+
+  .compare-table{
+    min-width:720px;
+  }
+
+  .compare-table th,
+  .compare-table td{
+    white-space:nowrap;
+    font-size:14px;
+    padding:14px 16px;
+  }
+
+}
+  
 .compare-page{
   max-width:1180px;
   margin:35px auto;
@@ -260,6 +286,17 @@
   margin-top:12px;
   text-align:center;
   color:#cbd5e1;
+}
+
+.compare-card,
+.compare-table-wrap{
+  width:100%;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+
+.compare-table{
+  min-width:720px;
 }
 
 @media(max-width:768px){
