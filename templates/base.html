@@ -82,6 +82,18 @@
   text-shadow: 0 0 6px rgba(238, 77, 45, 0.6);
 }
       /* ===== Popup (first visit) ===== */
+    @media(max-width:420px){
+  .popup-card{
+    width:94vw;
+  }
+
+  .popup-cta,
+  .popup-secondary-btn{
+    font-size:13px;
+    padding:11px 10px;
+  }
+}
+    
   .popup-overlay{
     position: fixed;
     inset: 0;
@@ -147,33 +159,36 @@
     font-size: 13px;
   }
 
-  .popup-cta{
-    display:block;
-    width:100%;
-    text-align:center;
-    padding: 12px 14px;
-    border-radius: 12px;
-    background:#EE4D2D;
-    color:#fff;
-    font-weight: 900;
-    letter-spacing: .02em;
-    border: 1px solid rgba(255,255,255,.12);
-  }
+.popup-cta{
+  background:#EE4D2D;
+  color:#fff;
+}
   .popup-cta:hover{
     filter: brightness(1.05);
     box-shadow: 0 0 18px rgba(238,77,45,.35);
   }
-  .popup-secondary-btn{
-  width:100%;
+.popup-secondary-btn{
   margin-top:10px;
-  padding:12px 14px;
-  border-radius:12px;
   border:none;
   background:#22D3EE;
   color:#001017;
-  font-weight:900;
   cursor:pointer;
-  transition:.2s;
+}
+.popup-cta,
+.popup-secondary-btn{
+  width:100%;
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  min-height:44px;
+  padding:12px 14px;
+  border-radius:12px;
+  font-weight:900;
+  font-size:14px;
+  line-height:1.2;
+  white-space:normal;
 }
 
 .popup-secondary-btn:hover{
