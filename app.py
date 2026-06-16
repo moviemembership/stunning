@@ -1012,6 +1012,10 @@ def instructions():
 def profile_compare():
     return render_template("profile_compare.html")
 
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template("404.html"), 404
+
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     app.run(debug=True)
