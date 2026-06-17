@@ -275,6 +275,7 @@
       <a id="popupShopeeBtn"
          class="popup-cta"
          href="/superlink">
+        onclick="closePopup()">
          Get Private Profile On Telegram
       </a>
 
@@ -347,24 +348,25 @@
       document.body.style.overflow = "";
     }
 
-    // show once per session
     if(!sessionStorage.getItem(KEY)){
       openPopup();
       sessionStorage.setItem(KEY, "1");
     }
 
     closeBtn.addEventListener("click", closePopup);
+
     popup.addEventListener("click", function(e){
       if(e.target === popup) closePopup();
     });
+
     document.addEventListener("keydown", function(e){
       if(e.key === "Escape") closePopup();
     });
 
-    // ✅ track click (non-blocking)
     if (shopeeBtn) {
       shopeeBtn.addEventListener("click", function(){
-        // sendBeacon won't block opening new tab
+        closePopup();
+
         if (navigator.sendBeacon) {
           const blob = new Blob([JSON.stringify({})], {type: "application/json"});
           navigator.sendBeacon("/track/shopee-click", blob);
@@ -373,17 +375,21 @@
         }
       });
     }
+
     if (getCodeBtn) {
       getCodeBtn.addEventListener("click", function(){
         closePopup();
       });
     }
-  })();
 
-    function toggleMenu(){
-      const menu = document.getElementById("mobileMenu");
-      menu.classList.toggle("show");
-    }
+})();
+
+function toggleMenu(){
+  const menu = document.getElementById("mobileMenu");
+  if(menu){
+    menu.classList.toggle("show");
+  }
+}
   </script>
 </body>
 </html>
