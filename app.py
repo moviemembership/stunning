@@ -1016,6 +1016,10 @@ def profile_compare():
 def page_not_found(e):
     return render_template("404.html"), 404
 
+@app.route("/superlink")
+def telegram():
+    return render_template("superlink.html")
+
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     app.run(debug=True)
