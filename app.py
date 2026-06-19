@@ -15,6 +15,7 @@ import imaplib, email, re as _re
 import requests
 from bs4 import BeautifulSoup
 import pathlib
+import hashlib
 import os, imaplib, email, json
 from flask import abort
 import socket
@@ -36,6 +37,12 @@ signin_request_count = 0
 OUTLOOK_URL = "https://yz.naifei.store/#/login"
 
 AUTO_SIGNIN_URL = "https://yzmen.4knaifei.cn"
+
+#------------ PAYMENT GATEWAY-------------
+
+TOYYIBPAY_SANDBOX_SECRET_KEY = os.environ.get("SANDBOX_SERCET_CODE")
+TOYYIBPAY_SANDBOX_CATEGORY_CODE = os.environ.get("SANDBOX_CATEGORY_CODE")
+TOYYIBPAY_SANDBOX_BASE = "https://dev.toyyibpay.com"
 
 # ---------------- CONFIG ----------------
 
@@ -1024,6 +1031,72 @@ def telegram():
 @app.route("/netflix-private-profile")
 def netflix_private_profile():
     return render_template("product_private_profile.html")
+
+@app.route("/test-private-profile")
+def test_private_profile():
+    return render_template("test_private_profile.html")
+
+
+@app.route("/test-private-profile-pay", methods=["POST"])
+def test_private_profile_pay():
+    name = request.form.get("name", "Customer")
+    email = request.form.get("email", "test@example.com")
+    phone = request.form.get("phone", "0123456789")
+    quantity = int(request.form.get("quantity", 1))
+
+    price_per_unit = 15.90
+    total_rm = price_per_unit * quantity
+    total_cent = int(total_rm * 100)
+
+    order_id = f"TESTPP{int(time.time())}"
+
+    bill_data = {
+        "userSecretKey": TOYYIBPAY_SANDBOX_SECRET_KEY,
+        "categoryCode": TOYYIBPAY_SANDBOX_CATEGORY_CODE,
+        "billName": "Private Profile",
+        "billDescription": f"Netflix Private Profile x{quantity}",
+        "billPriceSetting": 1,
+        "billPayorInfo": 1,
+        "billAmount": total_cent,
+        "billReturnUrl": "https://mantapnet.my/test-payment-return",
+        "billCallbackUrl": "https://mantapnet.my/test-payment-callback",
+        "billExternalReferenceNo": order_id,
+        "billTo": name,
+        "billEmail": email,
+        "billPhone": phone,
+        "billSplitPayment": 0,
+        "billSplitPaymentArgs": "",
+        "billPaymentChannel": 0,
+        "billContentEmail": "Thank you for testing Mantapnet payment.",
+        "billChargeToCustomer": 1,
+        "billExpiryDays": 1
+    }
+
+    response = requests.post(
+        f"{TOYYIBPAY_SANDBOX_BASE}/index.php/api/createBill",
+        data=bill_data,
+        timeout=20
+    )
+
+    result = response.json()
+
+    if result and "BillCode" in result[0]:
+        bill_code = result[0]["BillCode"]
+        return redirect(f"{TOYYIBPAY_SANDBOX_BASE}/{bill_code}")
+
+    return f"Unable to create sandbox bill: {result}"
+
+
+@app.route("/test-payment-return")
+def test_payment_return():
+    return render_template("test_payment_return.html")
+
+
+@app.route("/test-payment-callback", methods=["POST"])
+def test_payment_callback():
+    data = request.form.to_dict()
+    print("TOYYIBPAY SANDBOX CALLBACK:", data)
+    return "OK"
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
