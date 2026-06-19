@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="product-page">
+
+  <div class="product-box">
+
+    <div class="poster-box">
+      <img src="/static/netflixprivate.png" alt="Netflix Private Profile">
+    </div>
+
+    <div class="product-info">
+
+      <div class="badge">🔥 RM15.90 ONLY</div>
+
+      <h1>Netflix Private Profile</h1>
+
+      <p class="desc">
+        Private profile with edit profile, set profile PIN, own watching history
+        and no screen limit issue.
+      </p>
+
+      <div class="features">
+        <span>✅ Edit Profile</span>
+        <span>✅ Set Profile PIN</span>
+        <span>✅ Own Watching History</span>
+        <span>✅ No Screen Limit</span>
+      </div>
+
+      <div class="qty-section">
+        <div class="qty-title">Quantity</div>
+
+        <div class="qty-control">
+          <button type="button" onclick="minusQty()">−</button>
+          <span id="qtyNumber">1</span>
+          <button type="button" onclick="plusQty()">+</button>
+        </div>
+      </div>
+
+      <button class="buy-btn" onclick="buyNow()">
+        Buy Now
+      </button>
+
+      <p class="note">
+        After clicking Buy Now, the message will be copied and you will be redirected to Telegram.
+      </p>
+
+    </div>
+
+  </div>
+
+</div>
+
+<style>
+.product-page{
+  max-width:1050px;
+  margin:40px auto;
+  padding:20px;
+}
+
+.product-box{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:30px;
+  background:#0e162e;
+  border:1px solid #1f2b4a;
+  border-radius:24px;
+  padding:28px;
+  box-shadow:0 15px 40px rgba(0,0,0,.35);
+}
+
+.poster-box{
+  background:#111827;
+  border:1px solid #243150;
+  border-radius:22px;
+  padding:14px;
+}
+
+.poster-box img{
+  width:100%;
+  aspect-ratio:1/1;
+  object-fit:cover;
+  border-radius:18px;
+  display:block;
+}
+
+.product-info{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+
+.badge{
+  display:inline-block;
+  width:max-content;
+  background:#22d3ee;
+  color:#001017;
+  font-weight:900;
+  padding:9px 15px;
+  border-radius:999px;
+  margin-bottom:14px;
+}
+
+.product-info h1{
+  color:white;
+  font-size:38px;
+  margin:0 0 14px;
+}
+
+.desc{
+  color:#cbd5e1;
+  line-height:1.7;
+  font-size:17px;
+  margin-bottom:18px;
+}
+
+.features{
+  display:grid;
+  gap:10px;
+  margin-bottom:24px;
+}
+
+.features span{
+  background:#111827;
+  border:1px solid #243150;
+  padding:12px 14px;
+  border-radius:12px;
+  color:#e5e7eb;
+  font-weight:800;
+}
+
+.qty-section{
+  margin:8px 0 24px;
+}
+
+.qty-title{
+  color:white;
+  font-weight:900;
+  margin-bottom:12px;
+}
+
+.qty-control{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:190px;
+  border:1px solid #243150;
+  border-radius:14px;
+  overflow:hidden;
+  background:#111827;
+}
+
+.qty-control button{
+  width:58px;
+  height:50px;
+  border:none;
+  background:#1f2937;
+  color:white;
+  font-size:26px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.qty-control button:hover{
+  background:#374151;
+}
+
+.qty-control span{
+  width:74px;
+  text-align:center;
+  color:white;
+  font-size:22px;
+  font-weight:900;
+}
+
+.buy-btn{
+  width:100%;
+  border:none;
+  border-radius:14px;
+  background:#EE4D2D;
+  color:white;
+  font-size:18px;
+  font-weight:900;
+  padding:16px;
+  cursor:pointer;
+}
+
+.buy-btn:hover{
+  filter:brightness(1.08);
+}
+
+.note{
+  text-align:center;
+  color:#9ca3af;
+  font-size:13px;
+  margin-top:14px;
+}
+
+@media(max-width:768px){
+  .product-page{
+    padding:12px;
+    margin:20px auto;
+  }
+
+  .product-box{
+    grid-template-columns:1fr;
+    padding:18px;
+    gap:22px;
+  }
+
+  .product-info h1{
+    font-size:30px;
+  }
+
+  .desc{
+    font-size:15px;
+  }
+
+  .qty-control{
+    width:100%;
+  }
+
+  .qty-control button{
+    flex:1;
+  }
+
+  .qty-control span{
+    flex:1;
+  }
+}
+</style>
+
+<script>
+let qty = 1;
+
+function updateQty(){
+  document.getElementById("qtyNumber").innerText = qty;
+}
+
+function minusQty(){
+  if(qty > 1){
+    qty--;
+    updateQty();
+  }
+}
+
+function plusQty(){
+  qty++;
+  updateQty();
+}
+
+function buyNow(){
+  const message = "Hello, I'm interested in " + qty + " Netflix Private Profile";
+  const telegramLink = "https://t.me/movie_membership";
+
+  navigator.clipboard.writeText(message).finally(function(){
+    window.location.href = telegramLink;
+  });
+}
+</script>
+
+{% endblock %}
