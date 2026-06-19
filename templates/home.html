@@ -128,8 +128,11 @@
     <div class="quick-links">
 
       <a href="/profile-compare" class="quick-item">
-        <div class="quick-icon">📊</div>
-        <span>Compare</span>
+        <div>
+          <div class="quick-icon">📊</div>
+          <span>Profile Comparison</span>
+        </div>
+        <div>›</div>
       </a>
 
       <a href="/sign-in-code-auto" class="quick-item">
@@ -526,21 +529,34 @@
     padding:14px;
   }
 
-  .quick-title{
-    font-size:20px;
+  .quick-links{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    overflow:visible;
+    padding-bottom:0;
   }
 
   .quick-item{
-    min-width:110px;
-    padding:15px 12px;
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:#0e162e;
+    border:1px solid #1f2b4a;
+    border-radius:14px;
+    padding:18px;
   }
 
   .quick-icon{
-    font-size:26px;
+    margin:0;
+    font-size:28px;
+    flex-shrink:0;
   }
 
   .quick-item span{
-    font-size:13px;
+    font-size:16px;
+    font-weight:800;
   }
 }
 </style>
