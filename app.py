@@ -468,7 +468,6 @@ def get_verification_code(account_email, account_password):
 async def _get_verification_code_async(account_email, account_password):
     real_password = account_password.strip()
 
-    # If user types qwe222, get real password from password.txt
     if real_password == "qwe222":
         found_password = False
 
@@ -521,7 +520,7 @@ async def _get_verification_code_async(account_email, account_password):
                 timeout=45000
             )
 
-            # Wait until account opens and Click Replace is available
+            # Wait until account opens
             result = None
             start_time = time.time()
 
@@ -529,7 +528,7 @@ async def _get_verification_code_async(account_email, account_password):
                 body_text = await page.locator("body").inner_text()
 
                 if "CDK Does Not Exist" in body_text:
-                    return None, "Email or  Password incorrect. Please check and try again."
+                    return None, "Email or Password incorrect. Please check and try again."
 
                 if "Click Replace" in body_text:
                     result = "replace"
@@ -540,7 +539,7 @@ async def _get_verification_code_async(account_email, account_password):
             if result != "replace":
                 return None, "Unable to verify account. Please try again."
 
-            # Close blocking modal first if exists
+            # Close blocking modal if exists
             try:
                 ok_btn = page.locator(".ant-modal-confirm-btns button").last
                 if await ok_btn.count() > 0:
@@ -549,11 +548,47 @@ async def _get_verification_code_async(account_email, account_password):
             except Exception:
                 pass
 
+            async def find_6_digit_code():
+                await page.wait_for_timeout(1200)
+
+                final_text = await page.locator("body").inner_text()
+
+                ignored = {
+                    real_password,
+                    account_password.strip()
+                }
+
+                # Check input fields first
+                inputs = await page.locator("input").all()
+
+                for inp in inputs:
+                    try:
+                        value = (await inp.input_value()).strip()
+
+                        if (
+                            re.fullmatch(r"\d{6}", value)
+                            and value not in ignored
+                        ):
+                            return value
+                    except Exception:
+                        pass
+
+                # Check full visible page text / history table
+                matches = re.findall(r"\b\d{6}\b", final_text)
+
+                for code in matches:
+                    if code in ignored:
+                        continue
+
+                    return code
+
+                return None
+
             max_attempts = 5
 
             for attempt in range(max_attempts):
 
-                # Click Replace
+                # Always click replace first
                 await page.get_by_text("Click Replace", exact=True).click(
                     timeout=8000,
                     force=True
@@ -565,7 +600,7 @@ async def _get_verification_code_async(account_email, account_password):
                 except Exception:
                     pass
 
-                # Wait for result
+                # Wait for success or no-code result
                 try:
                     await page.wait_for_function(
                         """
@@ -573,7 +608,8 @@ async def _get_verification_code_async(account_email, account_password):
                             const text = document.body.innerText || "";
                             return (
                                 text.includes("Successfully obtained verification code") ||
-                                text.includes("We have not received the latest verification code")
+                                text.includes("We have not received the latest verification code") ||
+                                text.includes("Click Replace")
                             );
                         }
                         """,
@@ -582,53 +618,18 @@ async def _get_verification_code_async(account_email, account_password):
                 except Exception:
                     pass
 
-                final_text = await page.locator("body").inner_text()
+                await page.wait_for_timeout(1500)
 
-                # If no verification found
-                if "We have not received the latest verification code" in final_text:
-                    if attempt == 0:
-                        return None, "No 6-digit verification code found."
-                    return None, "No more verification code found."
-
-                latest_code = None
-
-                # Check input fields for 6-digit code, ignoring password
-                inputs = await page.locator("input").all()
-
-                for inp in inputs:
-                    try:
-                        value = (await inp.input_value()).strip()
-
-                        if (
-                            re.fullmatch(r"\d{6}", value)
-                            and value != real_password
-                        ):
-                            latest_code = value
-                            break
-
-                    except Exception:
-                        pass
-
-                # Backup: search visible text for 6-digit code, ignoring password
-                if not latest_code:
-                    matches = re.findall(r"\b\d{6}\b", final_text)
-                
-                    ignored = {
-                        real_password,
-                        account_password.strip()
-                    }
-                
-                    for m in matches:
-                        if m in ignored:
-                            continue
-                
-                        latest_code = m
-                        break
+                latest_code = await find_6_digit_code()
 
                 if latest_code:
                     return latest_code, None
 
-                # If success happened but code was 4-digit, try next history/code
+                final_text = await page.locator("body").inner_text()
+
+                if "We have not received the latest verification code" in final_text:
+                    return None, "No 6-digit verification code found."
+
                 await page.wait_for_timeout(800)
 
             return None, "No 6-digit verification code found after multiple attempts."
