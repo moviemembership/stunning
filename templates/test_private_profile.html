@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="product-page">
+
+  <div class="product-box">
+
+    <div class="poster-box">
+      <img src="/static/netflixprivate.png" alt="Netflix Private Profile">
+    </div>
+
+    <form class="product-info" method="POST" action="/test-private-profile-pay">
+
+      <div class="badge">SANDBOX TEST</div>
+
+      <h1>Netflix Private Profile</h1>
+
+      <p class="desc">
+        Private profile with edit profile, profile PIN, own watching history and no screen limit issue.
+      </p>
+
+      <div class="price">RM15.90 / unit</div>
+
+      <label>Name</label>
+      <input name="name" value="Test Customer" required>
+
+      <label>Email</label>
+      <input name="email" value="test@example.com" required>
+
+      <label>Phone</label>
+      <input name="phone" value="0123456789" required>
+
+      <div class="qty-section">
+        <div class="qty-title">Quantity</div>
+
+        <div class="qty-control">
+          <button type="button" onclick="minusQty()">−</button>
+          <input id="qtyInput" name="quantity" value="1" readonly>
+          <button type="button" onclick="plusQty()">+</button>
+        </div>
+      </div>
+
+      <div class="total-box">
+        Total: <span id="totalAmount">RM15.90</span>
+      </div>
+
+      <button class="buy-btn" type="submit">
+        Pay With ToyyibPay Sandbox
+      </button>
+
+    </form>
+
+  </div>
+
+</div>
+
+<style>
+.product-page{max-width:1050px;margin:40px auto;padding:20px;}
+.product-box{display:grid;grid-template-columns:1fr 1fr;gap:30px;background:#0e162e;border:1px solid #1f2b4a;border-radius:24px;padding:28px;}
+.poster-box{background:#111827;border:1px solid #243150;border-radius:22px;padding:14px;}
+.poster-box img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:18px;display:block;}
+.product-info{display:flex;flex-direction:column;justify-content:center;}
+.badge{width:max-content;background:#22d3ee;color:#001017;font-weight:900;padding:9px 15px;border-radius:999px;margin-bottom:14px;}
+.product-info h1{color:white;font-size:38px;margin:0 0 14px;}
+.desc{color:#cbd5e1;line-height:1.7;font-size:17px;}
+.price{color:#22d3ee;font-size:24px;font-weight:900;margin:10px 0 20px;}
+.product-info label{color:white;font-weight:800;margin-bottom:8px;}
+.product-info input{width:100%;padding:13px;border-radius:12px;border:1px solid #243150;background:#111827;color:white;margin-bottom:14px;}
+.qty-title{color:white;font-weight:900;margin-bottom:12px;}
+.qty-control{display:flex;border:1px solid #243150;border-radius:14px;overflow:hidden;background:#111827;margin-bottom:18px;}
+.qty-control button{width:60px;border:none;background:#1f2937;color:white;font-size:26px;font-weight:900;cursor:pointer;}
+.qty-control input{text-align:center;margin:0;border:none;border-left:1px solid #243150;border-right:1px solid #243150;border-radius:0;font-size:22px;font-weight:900;}
+.total-box{background:#111827;border:1px solid #243150;border-radius:14px;padding:15px;color:white;font-size:20px;font-weight:900;margin-bottom:18px;}
+.total-box span{color:#22d3ee;}
+.buy-btn{width:100%;border:none;border-radius:14px;background:#EE4D2D;color:white;font-size:18px;font-weight:900;padding:16px;cursor:pointer;}
+@media(max-width:768px){.product-page{padding:12px;margin:20px auto}.product-box{grid-template-columns:1fr;padding:18px}.product-info h1{font-size:30px}}
+</style>
+
+<script>
+let qty = 1;
+const price = 15.90;
+
+function updateTotal(){
+  document.getElementById("qtyInput").value = qty;
+  document.getElementById("totalAmount").innerText = "RM" + (qty * price).toFixed(2);
+}
+
+function minusQty(){
+  if(qty > 1){
+    qty--;
+    updateTotal();
+  }
+}
+
+function plusQty(){
+  qty++;
+  updateTotal();
+}
+</script>
+
+{% endblock %}
