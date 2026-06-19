@@ -30,6 +30,108 @@
     </table>
   </div>
 
+  <div class="mobile-compare">
+
+  <div class="feature-card">
+    <div class="feature-title">Up to 4K Quality</div>
+
+    <div class="feature-row">
+      <span class="feature-label">Shared Profile</span>
+      <span class="feature-value yes">✓ Yes</span>
+    </div>
+
+    <div class="feature-row">
+      <span class="feature-label">Private Profile</span>
+      <span class="feature-value yes">✓ Yes</span>
+    </div>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-title">All Devices Compatible</div>
+
+    <div class="feature-row">
+      <span class="feature-label">Shared Profile</span>
+      <span class="feature-value yes">✓ Yes</span>
+    </div>
+
+    <div class="feature-row">
+      <span class="feature-label">Private Profile</span>
+      <span class="feature-value yes">✓ Yes</span>
+    </div>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-title">Download Movies</div>
+
+    <div class="feature-row">
+      <span class="feature-label">Shared Profile</span>
+      <span class="feature-value yes">✓ Yes</span>
+    </div>
+
+    <div class="feature-row">
+      <span class="feature-label">Private Profile</span>
+      <span class="feature-value yes">✓ Yes</span>
+    </div>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-title">Spatial Audio</div>
+
+    <div class="feature-row">
+      <span class="feature-label">Shared Profile</span>
+      <span class="feature-value yes">✓ Yes</span>
+    </div>
+
+    <div class="feature-row">
+      <span class="feature-label">Private Profile</span>
+      <span class="feature-value yes">✓ Yes</span>
+    </div>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-title">Edit & Lock Profile</div>
+
+    <div class="feature-row">
+      <span class="feature-label">Shared Profile</span>
+      <span class="feature-value no">✕ No</span>
+    </div>
+
+    <div class="feature-row">
+      <span class="feature-label">Private Profile</span>
+      <span class="feature-value yes">✓ Yes</span>
+    </div>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-title">Own Watching History</div>
+
+    <div class="feature-row">
+      <span class="feature-label">Shared Profile</span>
+      <span class="feature-value no">✕ No</span>
+    </div>
+
+    <div class="feature-row">
+      <span class="feature-label">Private Profile</span>
+      <span class="feature-value yes">✓ Yes</span>
+    </div>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-title">No Screen Limit Issue</div>
+
+    <div class="feature-row">
+      <span class="feature-label">Shared Profile</span>
+      <span class="feature-value no">✕ No</span>
+    </div>
+
+    <div class="feature-row">
+      <span class="feature-label">Private Profile</span>
+      <span class="feature-value yes">✓ Yes</span>
+    </div>
+  </div>
+
+</div>
+
   <div class="profile-cards">
 
     <div class="profile-card shared">
@@ -64,28 +166,65 @@
 <style>
 @media(max-width:768px){
 
-  .compare-wrapper,
-  .compare-page{
-    padding:12px;
-    overflow:hidden;
-  }
-
-  .compare-card,
   .compare-table-wrap{
-    overflow-x:auto;
+    display:none;
   }
 
-  .compare-table{
-    min-width:720px;
+  .mobile-compare{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+    margin-top:20px;
   }
 
-  .compare-table th,
-  .compare-table td{
-    white-space:nowrap;
+  .feature-card{
+    background:#0e162e;
+    border:1px solid #1f2b4a;
+    border-radius:16px;
+    padding:18px;
+  }
+
+  .feature-title{
+    color:white;
+    font-weight:800;
+    font-size:18px;
+    margin-bottom:12px;
+  }
+
+  .feature-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:8px 0;
+    border-top:1px solid rgba(255,255,255,.08);
+  }
+
+  .feature-row:first-of-type{
+    border-top:none;
+  }
+
+  .feature-label{
+    color:#9ca3af;
     font-size:14px;
-    padding:14px 16px;
   }
 
+  .feature-value{
+    font-weight:800;
+  }
+
+  .yes{
+    color:#22c55e;
+  }
+
+  .no{
+    color:#ef4444;
+  }
+}
+
+@media(min-width:769px){
+  .mobile-compare{
+    display:none;
+  }
 }
 
   .price-badge{
