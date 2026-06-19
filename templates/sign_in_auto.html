@@ -8,8 +8,6 @@
 
     <h2 class="outlook-title">Get Sign-In Code</h2>
 
-    <div id="toastMsg" class="toast-msg"></div>
-
     <form method="POST" id="code-form">
 
       <label class="outlook-label">Account Email:</label>
@@ -79,6 +77,8 @@
         <li>Please wait around 30–60 seconds.</li>
       </ol>
     </div>
+
+  <div id="toastMsg" class="toast-msg"></div>
 
   </div>
 </div>
@@ -269,10 +269,10 @@
   transform:translateX(-50%);
   background:#22c55e;
   color:white;
-  padding:12px 22px;
+  padding:12px 24px;
   border-radius:999px;
   font-weight:900;
-  z-index:9999;
+  z-index:99999;
   opacity:0;
   pointer-events:none;
   transition:.25s;
@@ -367,6 +367,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 function showToast(text){
   const toast = document.getElementById("toastMsg");
+  if(!toast) return;
+
   toast.innerText = text;
   toast.classList.add("show");
 
