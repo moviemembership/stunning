@@ -44,10 +44,24 @@
     {% endif %}
 
     {% if code %}
-      <div class="code-box">{{ code }}</div>
+      <div class="code-box" id="codeValue">{{ code }}</div>
+    
       <p class="success-text">
         Please use the latest sign-in code. Make sure the sign-in code was sent before attempting to get the code.
       </p>
+    
+      <div class="code-actions">
+    
+        <button class="copy-btn" onclick="copyCode()">
+          Copy Code
+        </button>
+    
+        <button class="wrong-btn" onclick="wrongCode()">
+          Wrong Code
+        </button>
+    
+      </div>
+    
     {% endif %}
 
     {% if error %}
@@ -202,6 +216,49 @@
   color: #9ca3af;
   font-weight: 700;
 }
+.code-actions{
+  display:flex;
+  gap:12px;
+  margin-top:20px;
+}
+
+.copy-btn{
+  flex:1;
+  border:none;
+  border-radius:12px;
+  background:#22c55e;
+  color:white;
+  font-weight:800;
+  padding:14px;
+  cursor:pointer;
+  font-size:15px;
+}
+
+.copy-btn:hover{
+  background:#16a34a;
+}
+
+.wrong-btn{
+  flex:1;
+  border:none;
+  border-radius:12px;
+  background:#ef4444;
+  color:white;
+  font-weight:800;
+  padding:14px;
+  cursor:pointer;
+  font-size:15px;
+}
+
+.wrong-btn:hover{
+  background:#dc2626;
+}
+
+@media(max-width:600px){
+  .code-actions{
+    flex-direction:column;
+  }
+}
 </style>
 
 <script>
@@ -285,6 +342,18 @@ document.addEventListener("DOMContentLoaded", function () {
     updateProgress();
   });
 });
+
+function copyCode(){
+  const code = document.getElementById("codeValue").innerText;
+
+  navigator.clipboard.writeText(code).then(function(){
+    alert("Code copied!");
+  });
+}
+
+function wrongCode(){
+  window.location.href = "/telegram";
+}
 </script>
 
 
