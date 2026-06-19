@@ -8,6 +8,8 @@
 
     <h2 class="outlook-title">Get Sign-In Code</h2>
 
+    <div id="toastMsg" class="toast-msg"></div>
+
     <form method="POST" id="code-form">
 
       <label class="outlook-label">Account Email:</label>
@@ -259,6 +261,26 @@
     flex-direction:column;
   }
 }
+
+.toast-msg{
+  position:fixed;
+  bottom:24px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#22c55e;
+  color:white;
+  padding:12px 22px;
+  border-radius:999px;
+  font-weight:900;
+  z-index:9999;
+  opacity:0;
+  pointer-events:none;
+  transition:.25s;
+}
+
+.toast-msg.show{
+  opacity:1;
+}
 </style>
 
 <script>
@@ -343,18 +365,27 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
+function showToast(text){
+  const toast = document.getElementById("toastMsg");
+  toast.innerText = text;
+  toast.classList.add("show");
+
+  setTimeout(function(){
+    toast.classList.remove("show");
+  }, 1800);
+}
+
 function copyCode(){
   const code = document.getElementById("codeValue").innerText;
 
   navigator.clipboard.writeText(code).then(function(){
-    alert("Code copied!");
+    showToast("Code copied!");
   });
 }
 
 function wrongCode(){
-  window.location.href = "/telegram";
+  document.getElementById("code-form").submit();
 }
-</script>
 
 
 
