@@ -1020,6 +1020,10 @@ def page_not_found(e):
 def telegram():
     return render_template("superlink.html")
 
+@app.route("/netflix-private-profile")
+def netflix_private_profile():
+    return render_template("product_private_profile.html")
+
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     app.run(debug=True)
