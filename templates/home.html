@@ -530,34 +530,32 @@
   }
 
   .quick-links{
-    display:flex;
-    flex-direction:column;
-    gap:12px;
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:10px;
     overflow:visible;
-    padding-bottom:0;
   }
 
   .quick-item{
+    min-width:unset;
     width:100%;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    background:#0e162e;
-    border:1px solid #1f2b4a;
-    border-radius:14px;
-    padding:18px;
+    padding:14px 10px;
+    text-align:center;
+    border-radius:12px;
   }
 
   .quick-icon{
-    margin:0;
-    font-size:28px;
-    flex-shrink:0;
+    font-size:22px;
+    margin-bottom:6px;
   }
 
   .quick-item span{
-    font-size:16px;
-    font-weight:800;
+    display:block;
+    font-size:12px;
+    font-weight:700;
+    line-height:1.2;
   }
+
 }
 </style>
 
