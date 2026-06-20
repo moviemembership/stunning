@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="checkout-page">
+  <div class="checkout-box">
+
+    <h1>Complete Your Order</h1>
+
+    <div class="summary-box">
+      <p><strong>Product:</strong> Netflix Private Profile</p>
+      <p><strong>Quantity:</strong> {{ quantity }}</p>
+      <p><strong>Total:</strong> RM{{ "%.2f"|format(total) }}</p>
+    </div>
+
+    <form method="POST" action="/test-private-profile-pay">
+
+      <input type="hidden" name="quantity" value="{{ quantity }}">
+
+      <label>Name</label>
+      <input name="name" placeholder="Enter your name" required>
+
+      <label>Email</label>
+      <input name="email" type="email" placeholder="Enter your email" required>
+
+      <label>Phone</label>
+      <input name="phone" placeholder="Enter your phone number" required>
+
+      <button class="pay-btn" type="submit">
+        Pay With ToyyibPay Sandbox
+      </button>
+
+    </form>
+
+    <div class="login-box">
+      Already have an account?
+      <a href="/login">Login here</a>
+    </div>
+
+  </div>
+</div>
+
+<style>
+.checkout-page{
+  max-width:600px;
+  margin:40px auto;
+  padding:20px;
+}
+
+.checkout-box{
+  background:#0e162e;
+  border:1px solid #1f2b4a;
+  border-radius:24px;
+  padding:28px;
+}
+
+.checkout-box h1{
+  color:white;
+  margin-top:0;
+}
+
+.summary-box{
+  background:#111827;
+  border:1px solid #243150;
+  border-radius:16px;
+  padding:16px;
+  color:white;
+  margin-bottom:22px;
+}
+
+.checkout-box label{
+  display:block;
+  color:white;
+  font-weight:800;
+  margin-bottom:8px;
+}
+
+.checkout-box input{
+  width:100%;
+  padding:14px;
+  border-radius:12px;
+  border:1px solid #243150;
+  background:#111827;
+  color:white;
+  margin-bottom:16px;
+}
+
+.pay-btn{
+  width:100%;
+  border:none;
+  border-radius:14px;
+  background:#EE4D2D;
+  color:white;
+  font-size:18px;
+  font-weight:900;
+  padding:16px;
+  cursor:pointer;
+}
+
+.login-box{
+  color:#cbd5e1;
+  text-align:center;
+  margin-top:18px;
+}
+
+.login-box a{
+  color:#22d3ee;
+  font-weight:900;
+}
+</style>
+
+{% endblock %}
