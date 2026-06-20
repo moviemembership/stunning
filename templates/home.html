@@ -7,84 +7,78 @@
   <!-- HERO SLIDER -->
   <div class="hero-wrap">
     <div id="hero" class="hero">
-
-      <!-- Slide 1 -->
+  
+      <!-- Slide 1: Netflix Poster -->
       <div class="hero-slide active">
-        <section class="hero-split">
-
-          <div class="hero-left">
-            <div class="hero-video">
-              <iframe
-                src="https://www.youtube-nocookie.com/embed/kzE6bhaF6jk?modestbranding=1&rel=0&iv_load_policy=3"
-                title="How it works"
-                frameborder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowfullscreen>
-              </iframe>
-            </div>
-          </div>
-
-          <div class="hero-right">
-            <h1 class="hero-title">
-              GET<br>SIGN IN<br>CODE NOW
-            </h1>
-
-            <p class="hero-sub">
-              BY YOURSELF IN OUR SYSTEM
-            </p>
-
-            <a href="/sign-in-code-auto" class="hero-cta">
-              GET NOW
-            </a>
-          </div>
-
-        </section>
+        <a href="/netflix-private-profile" class="hero-image-slide">
+          <img src="/static/img/netflix-private-profile-poster.png" alt="Netflix Private Profile RM15.90">
+        </a>
       </div>
-
-      <!-- Slide 2 -->
+  
+      <!-- Slide 2: Sign-In Code -->
       <div class="hero-slide">
         <section class="hero-split">
-
           <div class="hero-left">
             <div class="hero-video">
-              <iframe
-                src="https://www.youtube-nocookie.com/embed/3RdAtoE26Fw?modestbranding=1&rel=0&iv_load_policy=3"
-                title="How it works"
-                frameborder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowfullscreen>
-              </iframe>
+              <iframe src="https://www.youtube-nocookie.com/embed/kzE6bhaF6jk?modestbranding=1&rel=0&iv_load_policy=3"></iframe>
             </div>
           </div>
-
+  
           <div class="hero-right">
-            <h1 class="hero-title">
-              HOUSEHOLD<br>CODE
-            </h1>
-
-            <p class="hero-sub">
-              Temporary Access Code via email link
-            </p>
-
-            <a href="/outlook-code" class="hero-cta">
-              REDEEM CODE
-            </a>
+            <h1 class="hero-title">GET<br>SIGN IN<br>CODE NOW</h1>
+            <p class="hero-sub">BY YOURSELF IN OUR SYSTEM</p>
+            <a href="/sign-in-code-auto" class="hero-cta">GET NOW</a>
           </div>
-
         </section>
       </div>
-
+  
+      <!-- Slide 3: Verification Code -->
+      <div class="hero-slide">
+        <section class="hero-split">
+          <div class="hero-left">
+            <div class="hero-video hero-empty">
+              <span>Video coming soon</span>
+            </div>
+          </div>
+  
+          <div class="hero-right">
+            <h1 class="hero-title">GET<br>VERIFICATION<br>CODE</h1>
+            <p class="hero-sub">FAST EMAIL VERIFICATION CODE</p>
+            <a href="/verification-code" class="hero-cta">GET CODE</a>
+          </div>
+        </section>
+      </div>
+  
+      <!-- Slide 4: Household Code -->
+      <div class="hero-slide">
+        <section class="hero-split">
+          <div class="hero-left">
+            <div class="hero-video">
+              <iframe src="https://www.youtube-nocookie.com/embed/3RdAtoE26Fw?modestbranding=1&rel=0&iv_load_policy=3"></iframe>
+            </div>
+          </div>
+  
+          <div class="hero-right">
+            <h1 class="hero-title">HOUSEHOLD<br>CODE</h1>
+            <p class="hero-sub">Temporary Access Code via email link</p>
+            <a href="/outlook-code" class="hero-cta">REDEEM CODE</a>
+          </div>
+        </section>
+      </div>
+  
       <button class="hero-nav prev" aria-label="Previous slide">‹</button>
       <button class="hero-nav next" aria-label="Next slide">›</button>
-
+  
       <div class="hero-dots">
-        <button class="dot active" data-to="0" aria-label="Slide 1"></button>
-        <button class="dot" data-to="1" aria-label="Slide 2"></button>
+        <button class="dot active" data-to="0"></button>
+        <button class="dot" data-to="1"></button>
+        <button class="dot" data-to="2"></button>
+        <button class="dot" data-to="3"></button>
       </div>
-
+  
     </div>
   </div>
-
+  
   <!-- PRODUCT CARD -->
   <div class="home-product">
 
@@ -166,6 +160,27 @@
 </div>
 
 <style>
+.hero-image-slide{
+  display:block;
+  width:100%;
+  height:100%;
+}
+
+.hero-image-slide img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+.hero-empty{
+  display:grid;
+  place-items:center;
+  color:#94a3b8;
+  font-weight:900;
+  font-size:22px;
+}
+
 *{
   box-sizing:border-box;
 }
