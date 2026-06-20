@@ -181,6 +181,12 @@
   font-size:22px;
 }
 
+.scroll-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
 *{
   box-sizing:border-box;
 }
@@ -497,6 +503,7 @@ body{
   }
 
   .hero{
+    touch-action: pan-y;
     width:100%;
     max-width:100%;
     aspect-ratio:auto;
@@ -677,6 +684,31 @@ body{
 
   hero.addEventListener("mouseenter", stop);
   hero.addEventListener("mouseleave", start);
+
+  let touchStartX = 0;
+let touchEndX = 0;
+
+hero.addEventListener("touchstart", function(e){
+  touchStartX = e.changedTouches[0].screenX;
+}, { passive: true });
+
+hero.addEventListener("touchend", function(e){
+  touchEndX = e.changedTouches[0].screenX;
+
+  const swipeDistance = touchStartX - touchEndX;
+
+  if(Math.abs(swipeDistance) > 50){
+    stop();
+
+    if(swipeDistance > 0){
+      nextSlide();   // swipe left
+    }else{
+      prevSlide();   // swipe right
+    }
+
+    start();
+  }
+}, { passive: true });
 
   start();
 })();
