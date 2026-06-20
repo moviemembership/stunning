@@ -1104,7 +1104,7 @@ def private_profile_checkout():
     total = quantity * 15.90
 
     return render_template(
-        "private_profile_checkout.html",
+        "test_private_profile_checkout.html",
         quantity=quantity,
         total=total
     )
