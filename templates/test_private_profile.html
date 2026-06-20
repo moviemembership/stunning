@@ -10,45 +10,36 @@
       <img src="/static/netflixprivate.png" alt="Netflix Private Profile">
     </div>
 
-    <form class="product-info" method="POST" action="/test-private-profile-pay">
+    <form class="product-info" method="POST" action="/private-profile-checkout">
 
       <div class="badge">SANDBOX TEST</div>
-
+    
       <h1>Netflix Private Profile</h1>
-
+    
       <p class="desc">
         Private profile with edit profile, profile PIN, own watching history and no screen limit issue.
       </p>
-
+    
       <div class="price">RM15.90 / unit</div>
-
-      <label>Name</label>
-      <input name="name" value="Test Customer" required>
-
-      <label>Email</label>
-      <input name="email" value="test@example.com" required>
-
-      <label>Phone</label>
-      <input name="phone" value="0123456789" required>
-
+    
       <div class="qty-section">
         <div class="qty-title">Quantity</div>
-
+    
         <div class="qty-control">
           <button type="button" onclick="minusQty()">−</button>
           <input id="qtyInput" name="quantity" value="1" readonly>
           <button type="button" onclick="plusQty()">+</button>
         </div>
       </div>
-
+    
       <div class="total-box">
         Total: <span id="totalAmount">RM15.90</span>
       </div>
-
+    
       <button class="buy-btn" type="submit">
-        Pay With ToyyibPay Sandbox
+        Buy Now
       </button>
-
+    
     </form>
 
   </div>
