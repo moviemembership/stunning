@@ -1098,6 +1098,17 @@ def test_payment_callback():
     print("TOYYIBPAY SANDBOX CALLBACK:", data)
     return "OK"
 
+@app.route("/test-private-profile-checkout", methods=["POST"])
+def private_profile_checkout():
+    quantity = int(request.form.get("quantity", 1))
+    total = quantity * 15.90
+
+    return render_template(
+        "private_profile_checkout.html",
+        quantity=quantity,
+        total=total
+    )
+
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     app.run(debug=True)
