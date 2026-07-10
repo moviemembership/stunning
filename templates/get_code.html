@@ -110,6 +110,28 @@
   transition:.2s ease;
 }
 
+.toast-msg{
+  position:fixed;
+  bottom:24px;
+  left:50%;
+  transform:translateX(-50%) translateY(15px);
+  background:#22c55e;
+  color:#fff;
+  padding:12px 24px;
+  border-radius:999px;
+  font-weight:900;
+  z-index:99999;
+  opacity:0;
+  pointer-events:none;
+  transition:.25s;
+  white-space:nowrap;
+}
+
+.toast-msg.show{
+  opacity:1;
+  transform:translateX(-50%) translateY(0);
+}
+
 .picker-btn:hover{
   color:white;
   background:rgba(255,255,255,.06);
@@ -233,6 +255,49 @@ document.addEventListener("DOMContentLoaded", function(){
   );
 
 });
+</script>
+
+<div id="toastMsg" class="toast-msg"></div>
+
+<script>
+function showToast(text){
+  const toast = document.getElementById("toastMsg");
+
+  if(!toast){
+    return;
+  }
+
+  toast.innerText = text;
+  toast.classList.add("show");
+
+  setTimeout(function(){
+    toast.classList.remove("show");
+  }, 1800);
+}
+
+function copyCode(button){
+  const card = button.closest(".outlook-card");
+  const codeElement = card.querySelector(".code-value");
+
+  if(!codeElement){
+    return;
+  }
+
+  navigator.clipboard.writeText(
+    codeElement.innerText.trim()
+  ).then(function(){
+    showToast("Code copied!");
+  });
+}
+
+function wrongCode(button){
+  const card = button.closest(".outlook-card");
+  const form = card.querySelector(".code-form");
+
+  if(form){
+    form.requestSubmit();
+  }
+}
 </script>
 
 {% endblock %}
