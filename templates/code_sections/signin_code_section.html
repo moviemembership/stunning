@@ -1,0 +1,387 @@
+<div class="outlook-wrapper">
+  <div class="outlook-card">
+
+    <h2 class="outlook-title">Get Sign-In Code</h2>
+
+    <form method="POST" id="code-form">
+
+      <label class="outlook-label">Account Email:</label>
+      <input class="outlook-input" type="email" name="email"
+       placeholder="example@hotmail.com"
+       value="{{ email or '' }}"
+       required>
+
+      <label class="outlook-label">Account Password:</label>
+      <input class="outlook-input" type="text" name="password"
+       placeholder="Enter account password"
+       value="{{ password or '' }}"
+       required>
+
+      <button class="outlook-btn" type="submit" id="submitBtn">Get Latest Code</button>
+
+      <div class="loading-box" id="loading">
+        <div class="progress-wrapper" id="progressWrapper">
+          <div class="progress-bar" id="progressBar">
+            <span id="progressPercent">0%</span>
+          </div>
+        </div>
+        
+        <div class="progress-step" id="progressStep">
+          Preparing...
+        </div>
+        Checking latest code, please wait...
+      </div>
+
+    </form>
+
+    {% if email %}
+      <div class="email-box">Entered email: {{ email }}</div>
+    {% endif %}
+
+    {% if code %}
+      <div class="code-box" id="codeValue">{{ code }}</div>
+    
+      <p class="success-text">
+        Please use the latest sign-in code. Make sure the sign-in code was sent before attempting to get the code.
+      </p>
+    
+      <div class="code-actions">
+    
+      <button class="copy-btn" type="button" onclick="copyCode()">
+        Copy Code
+      </button>
+      
+      <button class="wrong-btn" type="button" onclick="wrongCode()">
+        Wrong Code
+      </button>
+    
+      </div>
+    
+    {% endif %}
+
+    {% if error %}
+      <div class="error-box">{{ error }}</div>
+    {% endif %}
+
+    <div class="instruction-box">
+      <b>Instructions:</b>
+      <ol>
+        <li>Enter the account email and password.</li>
+        <li>Send the Netflix sign-in code first.</li>
+        <li>Click Get Latest Code.</li>
+        <li>Please wait around 30–60 seconds.</li>
+      </ol>
+    </div>
+
+  <div id="toastMsg" class="toast-msg"></div>
+
+  </div>
+</div>
+
+<style>
+.outlook-wrapper {
+  max-width: 550px;
+  margin: 40px auto;
+}
+
+.outlook-card {
+  background: #0e162e;
+  border: 1px solid #1f2b4a;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.35);
+}
+
+.outlook-title {
+  text-align: center;
+  color: #EE4D2D;
+  margin-bottom: 25px;
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.outlook-label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 700;
+  color: #e5e7eb;
+}
+
+.outlook-input {
+  width: 100%;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid #243150;
+  background: #111827;
+  color: #fff;
+  font-size: 16px;
+  margin-bottom: 18px;
+}
+
+.outlook-btn {
+  width: 100%;
+  border: none;
+  background: #EE4D2D;
+  color: white;
+  font-weight: 800;
+  font-size: 16px;
+  padding: 14px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.code-box {
+  margin-top: 28px;
+  text-align: center;
+  font-size: 54px;
+  font-weight: 900;
+  color: #22c55e;
+  letter-spacing: 10px;
+}
+
+.error-box {
+  margin-top: 22px;
+  text-align: center;
+  color: #ef4444;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.email-box {
+  margin-top: 18px;
+  text-align: center;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.loading-box {
+  display: none;
+  text-align: center;
+  margin-top: 18px;
+  color: #9ca3af;
+  font-weight: 700;
+}
+
+.success-text {
+  text-align: center;
+  color: #9ca3af;
+}
+
+.instruction-box {
+  margin-top: 28px;
+  border-top: 1px solid #243150;
+  padding-top: 22px;
+  color: #d1d5db;
+  line-height: 1.8;
+}
+
+.outlook-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+  .progress-wrapper {
+  display: none;
+  width: 100%;
+  height: 28px;
+  background: #dbeafe;
+  border: 3px solid #111827;
+  border-radius: 999px;
+  margin-top: 18px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  width: 0%;
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 999px;
+  transition: width 0.6s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.progress-step {
+  display: none;
+  margin-top: 10px;
+  text-align: center;
+  color: #9ca3af;
+  font-weight: 700;
+}
+.code-actions{
+  display:flex;
+  gap:12px;
+  margin-top:20px;
+}
+
+.copy-btn{
+  flex:1;
+  border:none;
+  border-radius:12px;
+  background:#22c55e;
+  color:white;
+  font-weight:800;
+  padding:14px;
+  cursor:pointer;
+  font-size:15px;
+}
+
+.copy-btn:hover{
+  background:#16a34a;
+}
+
+.wrong-btn{
+  flex:1;
+  border:none;
+  border-radius:12px;
+  background:#ef4444;
+  color:white;
+  font-weight:800;
+  padding:14px;
+  cursor:pointer;
+  font-size:15px;
+}
+
+.wrong-btn:hover{
+  background:#dc2626;
+}
+
+@media(max-width:600px){
+  .code-actions{
+    flex-direction:column;
+  }
+}
+
+.toast-msg{
+  position:fixed;
+  bottom:24px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#22c55e;
+  color:white;
+  padding:12px 24px;
+  border-radius:999px;
+  font-weight:900;
+  z-index:99999;
+  opacity:0;
+  pointer-events:none;
+  transition:.25s;
+}
+
+.toast-msg.show{
+  opacity:1;
+}
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const form = document.getElementById("code-form");
+  const button = document.getElementById("submitBtn");
+  const loading = document.getElementById("loading");
+
+  let submitted = false;
+
+  form.addEventListener("submit", function (e) {
+
+    if (submitted) {
+      e.preventDefault();
+      return false;
+    }
+
+    submitted = true;
+
+    loading.style.display = "block";
+
+    button.disabled = true;
+    button.innerText = "Please wait...";
+    button.style.opacity = "0.6";
+    button.style.cursor = "not-allowed";
+    button.style.pointerEvents = "none";
+  });
+
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+  const form = document.getElementById("code-form");
+  const button = document.getElementById("submitBtn");
+  const loading = document.getElementById("loading");
+  const progressWrapper = document.getElementById("progressWrapper");
+  const progressBar = document.getElementById("progressBar");
+  const progressPercent = document.getElementById("progressPercent");
+  const progressStep = document.getElementById("progressStep");
+
+  let submitted = false;
+
+  const steps = [
+    { percent: 20, text: "20%." },
+    { percent: 40, text: "40%" },
+    { percent: 60, text: "60%" },
+    { percent: 80, text: "80%" },
+    { percent: 95, text: "95%" }
+  ];
+
+  form.addEventListener("submit", function (e) {
+    if (submitted) {
+      e.preventDefault();
+      return false;
+    }
+
+    submitted = true;
+
+    loading.style.display = "block";
+    progressWrapper.style.display = "block";
+    progressStep.style.display = "block";
+
+    button.disabled = true;
+    button.innerText = "Please wait...";
+    button.style.opacity = "0.6";
+    button.style.cursor = "not-allowed";
+    button.style.pointerEvents = "none";
+
+    let index = 0;
+
+    function updateProgress() {
+      if (index < steps.length) {
+        progressBar.style.width = steps[index].percent + "%";
+        progressPercent.innerText = steps[index].percent + "%";
+        progressStep.innerText = steps[index].text;
+        index++;
+        setTimeout(updateProgress, 6000);
+      }
+    }
+
+    updateProgress();
+  });
+});
+
+function showToast(text){
+  const toast = document.getElementById("toastMsg");
+  if(!toast) return;
+
+  toast.innerText = text;
+  toast.classList.add("show");
+
+  setTimeout(function(){
+    toast.classList.remove("show");
+  }, 1800);
+}
+
+function copyCode(){
+  const code = document.getElementById("codeValue").innerText;
+
+  navigator.clipboard.writeText(code).then(function(){
+    showToast("Code copied!");
+  });
+}
+
+function wrongCode(){
+  document.getElementById("code-form").submit();
+}
+
+</script>
