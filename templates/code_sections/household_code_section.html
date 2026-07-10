@@ -1,124 +1,13 @@
-<style>
-  .outlook-wrapper {
-    max-width: 550px;
-    margin: 40px auto;
-  }
-
-  .outlook-card {
-    background: #0e162e;
-    border: 1px solid #1f2b4a;
-    border-radius: 16px;
-    padding: 30px;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.35);
-  }
-
-  .outlook-title {
-    text-align: center;
-    color: #EE4D2D;
-    margin-bottom: 25px;
-    font-size: 32px;
-    font-weight: 800;
-  }
-
-  .outlook-label {
-    display: block;
-    margin-bottom: 10px;
-    font-weight: 700;
-    color: #e5e7eb;
-  }
-
-  .outlook-input {
-    width: 100%;
-    padding: 14px;
-    border-radius: 10px;
-    border: 1px solid #243150;
-    background: #111827;
-    color: #fff;
-    font-size: 16px;
-    margin-bottom: 18px;
-  }
-
-  .outlook-input:focus {
-    outline: none;
-    border-color: #EE4D2D;
-    box-shadow: 0 0 0 3px rgba(238,77,45,0.2);
-  }
-
-  .outlook-btn {
-    width: 100%;
-    border: none;
-    background: #EE4D2D;
-    color: white;
-    font-weight: 800;
-    font-size: 16px;
-    padding: 14px;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: 0.2s;
-  }
-
-  .outlook-btn:hover {
-    background: #ff623f;
-    transform: translateY(-1px);
-  }
-
-  .code-box {
-    margin-top: 28px;
-    text-align: center;
-    font-size: 54px;
-    font-weight: 900;
-    color: #22c55e;
-    letter-spacing: 10px;
-  }
-
-  .error-box {
-    margin-top: 22px;
-    text-align: center;
-    color: #ef4444;
-    font-weight: 700;
-    line-height: 1.7;
-  }
-
-  .email-box {
-    margin-top: 18px;
-    text-align: center;
-    color: #9ca3af;
-    font-style: italic;
-  }
-
-  .loading-box {
-    display: none;
-    text-align: center;
-    margin-top: 18px;
-    color: #9ca3af;
-    font-weight: 700;
-  }
-
-  .instruction-box {
-    margin-top: 28px;
-    border-top: 1px solid #243150;
-    padding-top: 22px;
-    color: #d1d5db;
-    line-height: 1.8;
-  }
-
-  .instruction-box ol {
-    padding-left: 20px;
-  }
-</style>
-
 <div class="outlook-wrapper">
   <div class="outlook-card">
 
-    <div class="outlook-title">
-      Retrieve Household Code
-    </div>
+    <h2 class="outlook-title">Retrieve Household Code</h2>
 
     <form
       method="POST"
       action="{{ url_for('get_code') }}?type=household"
       class="code-form">
-    
+
       <input type="hidden" name="code_type" value="household">
 
       <label class="outlook-label">
@@ -130,15 +19,29 @@
         type="email"
         name="email"
         placeholder="example@hotmail.com"
-        required
-      >
+        value="{{ email or '' }}"
+        required>
 
-      <button class="outlook-btn" type="submit">
+      <button class="outlook-btn submit-btn" type="submit">
         Get Household Code
       </button>
 
-      <div class="loading-box" id="loading">
-        Checking code, please wait...
+      <div class="loading-box">
+
+        <div class="progress-wrapper">
+          <div class="progress-bar">
+            <span class="progress-percent">0%</span>
+          </div>
+        </div>
+
+        <div class="progress-step">
+          Preparing...
+        </div>
+
+        <div class="loading-text">
+          Checking latest household code, please wait...
+        </div>
+
       </div>
 
     </form>
@@ -150,8 +53,30 @@
     {% endif %}
 
     {% if selected == "household" and code %}
-      <div class="code-box">
+      <div class="code-box code-value">
         {{ code }}
+      </div>
+
+      <p class="success-text">
+        Please use the latest household code.
+      </p>
+
+      <div class="code-actions">
+
+        <button
+          class="copy-btn"
+          type="button"
+          onclick="copyCode(this)">
+          Copy Code
+        </button>
+
+        <button
+          class="wrong-btn"
+          type="button"
+          onclick="wrongCode(this)">
+          Wrong Code
+        </button>
+
       </div>
     {% endif %}
 
@@ -162,21 +87,353 @@
     {% endif %}
 
     <div class="instruction-box">
-      <b>Instruction:</b>
+      <b>Instructions:</b>
 
       <ol>
-        <li>Enter the Outlook / Hotmail email.</li>
+        <li>Enter the Outlook or Hotmail email.</li>
+        <li>Request the household code from Netflix first.</li>
         <li>Click Get Household Code.</li>
-        <li>Please wait around 1 minutess.</li>
-        <li>If the link expired, resend the code and try again.</li>
+        <li>Please wait around 30–60 seconds.</li>
+        <li>If the link has expired, resend it and try again.</li>
       </ol>
     </div>
 
   </div>
 </div>
 
+<style>
+*,
+*::before,
+*::after{
+  box-sizing:border-box;
+}
+
+.outlook-wrapper{
+  width:100%;
+  max-width:550px;
+  margin:40px auto;
+  padding:0 14px;
+}
+
+.outlook-card{
+  width:100%;
+  max-width:100%;
+  background:#0e162e;
+  border:1px solid #1f2b4a;
+  border-radius:16px;
+  padding:30px;
+  box-shadow:0 8px 25px rgba(0,0,0,.35);
+  overflow:hidden;
+}
+
+.outlook-title{
+  text-align:center;
+  color:#EE4D2D;
+  margin:0 0 25px;
+  font-size:32px;
+  font-weight:800;
+}
+
+.outlook-label{
+  display:block;
+  margin-bottom:10px;
+  font-weight:700;
+  color:#e5e7eb;
+}
+
+.outlook-input{
+  display:block;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  padding:14px;
+  border-radius:10px;
+  border:1px solid #243150;
+  background:#111827;
+  color:#fff;
+  font-size:16px;
+  margin:0 0 18px;
+  outline:none;
+}
+
+.outlook-input:focus{
+  border-color:#EE4D2D;
+  box-shadow:0 0 0 3px rgba(238,77,45,.2);
+}
+
+.outlook-btn{
+  width:100%;
+  max-width:100%;
+  border:none;
+  background:#EE4D2D;
+  color:#fff;
+  font-weight:800;
+  font-size:16px;
+  padding:14px;
+  border-radius:12px;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.outlook-btn:hover{
+  background:#ff623f;
+  transform:translateY(-1px);
+}
+
+.outlook-btn:disabled{
+  opacity:.6;
+  cursor:not-allowed;
+  pointer-events:none;
+}
+
+.loading-box{
+  display:none;
+  width:100%;
+  max-width:100%;
+  text-align:center;
+  margin-top:18px;
+  color:#9ca3af;
+  font-weight:700;
+}
+
+.progress-wrapper{
+  display:none;
+  width:100%;
+  max-width:100%;
+  height:28px;
+  background:#dbeafe;
+  border:3px solid #111827;
+  border-radius:999px;
+  overflow:hidden;
+}
+
+.progress-bar{
+  width:0%;
+  height:100%;
+  background:#3b82f6;
+  border-radius:999px;
+  transition:width .6s ease;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  font-weight:900;
+  font-size:13px;
+}
+
+.progress-step{
+  display:none;
+  margin-top:10px;
+  text-align:center;
+  color:#9ca3af;
+  font-weight:700;
+}
+
+.loading-text{
+  margin-top:6px;
+  font-size:14px;
+  color:#9ca3af;
+}
+
+.code-box{
+  max-width:100%;
+  margin-top:28px;
+  text-align:center;
+  font-size:54px;
+  font-weight:900;
+  color:#22c55e;
+  letter-spacing:10px;
+  overflow-wrap:anywhere;
+}
+
+.error-box{
+  margin-top:22px;
+  padding:14px;
+  border:1px solid rgba(239,68,68,.35);
+  border-radius:12px;
+  background:rgba(239,68,68,.08);
+  text-align:center;
+  color:#ef4444;
+  font-weight:700;
+  line-height:1.7;
+}
+
+.email-box{
+  margin-top:18px;
+  text-align:center;
+  color:#9ca3af;
+  font-style:italic;
+  overflow-wrap:anywhere;
+}
+
+.success-text{
+  text-align:center;
+  color:#9ca3af;
+  line-height:1.6;
+}
+
+.instruction-box{
+  margin-top:28px;
+  border-top:1px solid #243150;
+  padding-top:22px;
+  color:#d1d5db;
+  line-height:1.8;
+}
+
+.instruction-box ol{
+  margin-bottom:0;
+  padding-left:22px;
+}
+
+.code-actions{
+  display:flex;
+  gap:12px;
+  margin-top:20px;
+}
+
+.copy-btn,
+.wrong-btn{
+  flex:1;
+  min-width:0;
+  border:none;
+  border-radius:12px;
+  color:#fff;
+  font-weight:800;
+  padding:14px;
+  cursor:pointer;
+  font-size:15px;
+}
+
+.copy-btn{
+  background:#22c55e;
+}
+
+.copy-btn:hover{
+  background:#16a34a;
+}
+
+.wrong-btn{
+  background:#ef4444;
+}
+
+.wrong-btn:hover{
+  background:#dc2626;
+}
+
+@media(max-width:600px){
+  .outlook-wrapper{
+    margin:20px auto;
+    padding:0;
+  }
+
+  .outlook-card{
+    padding:22px 18px;
+    border-radius:14px;
+  }
+
+  .outlook-title{
+    font-size:26px;
+  }
+
+  .code-box{
+    font-size:38px;
+    letter-spacing:5px;
+  }
+
+  .code-actions{
+    flex-direction:column;
+  }
+}
+</style>
+
 <script>
-document.getElementById("code-form").addEventListener("submit", function () {
-  document.getElementById("loading").style.display = "block";
+document.addEventListener("DOMContentLoaded", function(){
+
+  const forms = document.querySelectorAll(".code-form");
+
+  forms.forEach(function(form){
+
+    if(form.dataset.loadingReady === "1"){
+      return;
+    }
+
+    form.dataset.loadingReady = "1";
+
+    const button = form.querySelector(".submit-btn");
+    const loading = form.querySelector(".loading-box");
+    const progressWrapper = form.querySelector(".progress-wrapper");
+    const progressBar = form.querySelector(".progress-bar");
+    const progressPercent = form.querySelector(".progress-percent");
+    const progressStep = form.querySelector(".progress-step");
+
+    let submitted = false;
+
+    const steps = [
+      { percent:20, text:"Preparing request..." },
+      { percent:40, text:"Connecting to household service..." },
+      { percent:60, text:"Checking latest household email..." },
+      { percent:80, text:"Opening temporary access link..." },
+      { percent:95, text:"Almost complete..." }
+    ];
+
+    form.addEventListener("submit", function(e){
+
+      if(submitted){
+        e.preventDefault();
+        return;
+      }
+
+      submitted = true;
+
+      if(loading){
+        loading.style.display = "block";
+      }
+
+      if(progressWrapper){
+        progressWrapper.style.display = "block";
+      }
+
+      if(progressStep){
+        progressStep.style.display = "block";
+      }
+
+      if(button){
+        button.disabled = true;
+        button.innerText = "Please wait...";
+      }
+
+      let index = 0;
+
+      function updateProgress(){
+
+        if(index >= steps.length){
+          return;
+        }
+
+        const step = steps[index];
+
+        if(progressBar){
+          progressBar.style.width = step.percent + "%";
+        }
+
+        if(progressPercent){
+          progressPercent.innerText = step.percent + "%";
+        }
+
+        if(progressStep){
+          progressStep.innerText =
+            step.percent + "% " + step.text;
+        }
+
+        index++;
+
+        setTimeout(updateProgress, 6000);
+      }
+
+      updateProgress();
+    });
+
+  });
+
 });
 </script>
