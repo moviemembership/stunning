@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="get-code-page">
+
+  <div class="code-picker-wrap">
+
+    <div class="code-picker">
+
+      <button
+        type="button"
+        class="picker-btn active"
+        data-code-type="signin">
+        Sign-In Code
+      </button>
+
+      <button
+        type="button"
+        class="picker-btn"
+        data-code-type="verification">
+        Verification Code
+      </button>
+
+      <button
+        type="button"
+        class="picker-btn"
+        data-code-type="household">
+        Household Code
+      </button>
+
+    </div>
+
+  </div>
+
+  <!-- SIGN-IN CODE -->
+  <section
+    id="signin-panel"
+    class="code-panel active"
+    data-code-panel="signin">
+
+    {% include "code_sections/signin_code_section.html" %}
+
+  </section>
+
+  <!-- VERIFICATION CODE -->
+  <section
+    id="verification-panel"
+    class="code-panel"
+    data-code-panel="verification">
+
+    {% include "code_sections/verification_code_section.html" %}
+
+  </section>
+
+  <!-- HOUSEHOLD CODE -->
+  <section
+    id="household-panel"
+    class="code-panel"
+    data-code-panel="household">
+
+    {% include "code_sections/household_code_section.html" %}
+
+  </section>
+
+</div>
+
+<style>
+.get-code-page{
+  width:100%;
+  max-width:1000px;
+  margin:0 auto;
+  padding:24px 14px 50px;
+}
+
+.code-picker-wrap{
+  position:sticky;
+  top:12px;
+  z-index:20;
+  display:flex;
+  justify-content:center;
+  margin-bottom:24px;
+}
+
+.code-picker{
+  display:flex;
+  width:100%;
+  max-width:680px;
+  padding:6px;
+  gap:6px;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:18px;
+  background:rgba(15,23,42,.68);
+  box-shadow:0 12px 35px rgba(0,0,0,.28);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+}
+
+.picker-btn{
+  flex:1;
+  min-width:0;
+  border:none;
+  border-radius:13px;
+  padding:13px 10px;
+  background:transparent;
+  color:#94a3b8;
+  font-size:14px;
+  font-weight:900;
+  cursor:pointer;
+  transition:.2s ease;
+}
+
+.picker-btn:hover{
+  color:white;
+  background:rgba(255,255,255,.06);
+}
+
+.picker-btn.active{
+  background:white;
+  color:#0f172a;
+  box-shadow:0 5px 18px rgba(0,0,0,.24);
+}
+
+.code-panel{
+  display:none;
+}
+
+.code-panel.active{
+  display:block;
+  animation:panelFade .22s ease;
+}
+
+@keyframes panelFade{
+  from{
+    opacity:0;
+    transform:translateY(5px);
+  }
+
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+@media(max-width:600px){
+  .get-code-page{
+    padding:14px 10px 35px;
+  }
+
+  .code-picker-wrap{
+    top:8px;
+    margin-bottom:16px;
+  }
+
+  .code-picker{
+    gap:3px;
+    padding:4px;
+    border-radius:14px;
+  }
+
+  .picker-btn{
+    padding:11px 5px;
+    border-radius:10px;
+    font-size:11px;
+    line-height:1.15;
+  }
+}
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+
+  const pickerButtons =
+    document.querySelectorAll("[data-code-type]");
+
+  const panels =
+    document.querySelectorAll("[data-code-panel]");
+
+  function showCodePanel(type, updateUrl = true){
+
+    pickerButtons.forEach(function(button){
+      button.classList.toggle(
+        "active",
+        button.dataset.codeType === type
+      );
+    });
+
+    panels.forEach(function(panel){
+      panel.classList.toggle(
+        "active",
+        panel.dataset.codePanel === type
+      );
+    });
+
+    if(updateUrl){
+      const url = new URL(window.location.href);
+      url.searchParams.set("type", type);
+
+      window.history.replaceState(
+        {},
+        "",
+        url.toString()
+      );
+    }
+
+    window.scrollTo({
+      top:0,
+      behavior:"smooth"
+    });
+  }
+
+  pickerButtons.forEach(function(button){
+    button.addEventListener("click", function(){
+      showCodePanel(this.dataset.codeType);
+    });
+  });
+
+  const initialType =
+    new URLSearchParams(window.location.search).get("type")
+    || "signin";
+
+  const validTypes = [
+    "signin",
+    "verification",
+    "household"
+  ];
+
+  showCodePanel(
+    validTypes.includes(initialType)
+      ? initialType
+      : "signin",
+    false
+  );
+
+});
+</script>
+
+{% endblock %}
