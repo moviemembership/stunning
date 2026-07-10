@@ -1,0 +1,177 @@
+<style>
+  .outlook-wrapper {
+    max-width: 550px;
+    margin: 40px auto;
+  }
+
+  .outlook-card {
+    background: #0e162e;
+    border: 1px solid #1f2b4a;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.35);
+  }
+
+  .outlook-title {
+    text-align: center;
+    color: #EE4D2D;
+    margin-bottom: 25px;
+    font-size: 32px;
+    font-weight: 800;
+  }
+
+  .outlook-label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 700;
+    color: #e5e7eb;
+  }
+
+  .outlook-input {
+    width: 100%;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid #243150;
+    background: #111827;
+    color: #fff;
+    font-size: 16px;
+    margin-bottom: 18px;
+  }
+
+  .outlook-input:focus {
+    outline: none;
+    border-color: #EE4D2D;
+    box-shadow: 0 0 0 3px rgba(238,77,45,0.2);
+  }
+
+  .outlook-btn {
+    width: 100%;
+    border: none;
+    background: #EE4D2D;
+    color: white;
+    font-weight: 800;
+    font-size: 16px;
+    padding: 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  .outlook-btn:hover {
+    background: #ff623f;
+    transform: translateY(-1px);
+  }
+
+  .code-box {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 54px;
+    font-weight: 900;
+    color: #22c55e;
+    letter-spacing: 10px;
+  }
+
+  .error-box {
+    margin-top: 22px;
+    text-align: center;
+    color: #ef4444;
+    font-weight: 700;
+    line-height: 1.7;
+  }
+
+  .email-box {
+    margin-top: 18px;
+    text-align: center;
+    color: #9ca3af;
+    font-style: italic;
+  }
+
+  .loading-box {
+    display: none;
+    text-align: center;
+    margin-top: 18px;
+    color: #9ca3af;
+    font-weight: 700;
+  }
+
+  .instruction-box {
+    margin-top: 28px;
+    border-top: 1px solid #243150;
+    padding-top: 22px;
+    color: #d1d5db;
+    line-height: 1.8;
+  }
+
+  .instruction-box ol {
+    padding-left: 20px;
+  }
+</style>
+
+<div class="outlook-wrapper">
+  <div class="outlook-card">
+
+    <div class="outlook-title">
+      Retrieve Household Code
+    </div>
+
+    <form method="POST" id="code-form">
+
+      <label class="outlook-label">
+        Enter Outlook / Hotmail Email:
+      </label>
+
+      <input
+        class="outlook-input"
+        type="email"
+        name="email"
+        placeholder="example@hotmail.com"
+        required
+      >
+
+      <button class="outlook-btn" type="submit">
+        Get Household Code
+      </button>
+
+      <div class="loading-box" id="loading">
+        Checking code, please wait...
+      </div>
+
+    </form>
+
+    {% if email %}
+      <div class="email-box">
+        Entered email: {{ email }}
+      </div>
+    {% endif %}
+
+    {% if code %}
+      <div class="code-box">
+        {{ code }}
+      </div>
+    {% endif %}
+
+    {% if error %}
+      <div class="error-box">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    <div class="instruction-box">
+      <b>Instruction:</b>
+
+      <ol>
+        <li>Enter the Outlook / Hotmail email.</li>
+        <li>Click Get Household Code.</li>
+        <li>Please wait around 1 minutess.</li>
+        <li>If the link expired, resend the code and try again.</li>
+      </ol>
+    </div>
+
+  </div>
+</div>
+
+<script>
+document.getElementById("code-form").addEventListener("submit", function () {
+  document.getElementById("loading").style.display = "block";
+});
+</script>
