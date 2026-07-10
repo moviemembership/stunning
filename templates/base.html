@@ -29,16 +29,16 @@
 <meta property="og:url" content="https://mantapnet.onrender.com/">
 <meta property="og:type" content="website">
   <style>
-    :root {   --bg:#0f172a;--card:#111827;--text:#e5e7eb;--muted:#9ca3af;--accent:#22d3ee; }
-    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:#000; color:var(--text); }
+    :root { --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#9ca3af; --accent:#22d3ee; }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:#0b1020; color:var(--text); }
     a { color: var(--accent); text-decoration: none; }
     .container { max-width: 1100px; margin: 0 auto; padding: 16px; }
 
     /* Top nav */
     .nav {
       position: sticky; top:0; z-index:20;
-      background:#000;
-      border-bottom:1px solid #232323;
+      background:linear-gradient(90deg,#0b1020,#0d1022);
+      border-bottom:1px solid #1f2937;
     }
     .nav-inner {
       display:flex; align-items:center; justify-content:space-between; gap:16px;
@@ -47,14 +47,14 @@
       display:flex; align-items:center; gap:10px; font-weight:700;
     }
     .brand-dot {
-      background:#EE4D2D;
-      box-shadow:0 0 12px rgba(238,77,45,.5);
+      width:10px; height:10px; border-radius:999px;
+      background:var(--accent); box-shadow:0 0 20px var(--accent);
     }
     .nav-links { display:flex; gap:16px; }
 
     /* Hero section */
     .hero {
-      background: radial-gradient(1200px 400px at 50% -200px, rgba(255,255,255,.06), transparent 70%);
+      background: radial-gradient(1200px 400px at 50% -200px, rgba(34,211,238,0.18), transparent 70%);
       padding: 48px 0;
       border-bottom:1px solid #1f2937;
     }
@@ -63,7 +63,7 @@
 
     /* Cards */
     .list { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap:16px; margin-top:20px; }
-    .card { background:#111; border:1px solid #2a2a2a; border-radius:14px; padding:16px; }
+    .card { background:#0e162e; border:1px solid #1f2b4a; border-radius:14px; padding:16px; }
     .btn { display:inline-block; background:var(--accent); color:#001017; padding:10px 14px; border-radius:10px; font-weight:600; }
     .card-link { text-decoration:none; color:inherit; }
     .card-link .card { transition: transform .15s, box-shadow .15s; }
@@ -108,8 +108,8 @@
 
   .popup-card{
     width: min(420px, 92vw);
-    background:#111;
-    border:1px solid #2a2a2a;
+    background:#0e162e;
+    border:1px solid #1f2b4a;
     border-radius: 16px;
     box-shadow: 0 18px 60px rgba(0,0,0,.55);
     overflow: hidden;
@@ -123,8 +123,8 @@
     width:36px;
     height:36px;
     border-radius: 12px;
-    border:1px solid #333;
-    background: #1a1a1a
+    border:1px solid #243150;
+    background: rgba(15,26,47,.85);
     color:#e5e7eb;
     cursor:pointer;
     font-size: 18px;
@@ -137,7 +137,7 @@
   .popup-poster{
     width: 100%;
     aspect-ratio: 1 / 1;          /* 1:1 poster */
-    background: #111;
+    background: #0b1327;
     outline: 1px solid #1f2b4a;
     display:block;
     object-fit: cover;
@@ -247,12 +247,6 @@
     
     <div class="nav-links" id="mobileMenu">
         <a href="/">Home</a>
-        <a href="https://shopee.com.my/vertex_world"
-   target="_blank"
-   rel="noopener noreferrer"
-   class="new-shopee">
-  New Shopee Account
-</a>
         <a href="/get-code?type=signin">Get sign-in code</a>
         <a href="/get-code?type=verification">Verification Code</a>
         <a href="/get-code?type=household">Household Code</a>
