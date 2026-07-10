@@ -218,133 +218,383 @@ def redeem():
         error=error
     )
 
-# ---------------- OUTLOOK SIGN IN CODE ----------------#
+# =========================================================
+# SHARED SIGN-IN / VERIFICATION HELPERS
+# =========================================================
+
+EXPIRED_CDK_ERROR = (
+    "This email has expired and can no longer retrieve a code. "
+    "Please contact customer service for a replacement account."
+)
+
+INCORRECT_ACCOUNT_ERROR = (
+    "Email or Password incorrect. Please check and try again."
+)
+
+
+def resolve_account_password(account_email, account_password):
+    """
+    Resolve the real account password.
+
+    When the submitted password is qwe222, read the matching password
+    from password.txt.
+    """
+    account_email = (account_email or "").strip()
+    real_password = (account_password or "").strip()
+
+    if real_password != "qwe222":
+        return real_password, None
+
+    try:
+        with open("password.txt", "r", encoding="utf-8") as file:
+            for line in file:
+                parts = re.split(r"\s+", line.strip())
+
+                if (
+                    len(parts) >= 2
+                    and parts[0].lower() == account_email.lower()
+                ):
+                    return parts[1], None
+
+        return None, "Email not updated. Please ask admin to update."
+
+    except Exception as exc:
+        return None, f"Unable to read password.txt: {str(exc)}"
+
+
+def text_has_expired_cdk(text):
+    normalized = " ".join((text or "").lower().split())
+
+    expired_messages = (
+        "cdk has expired",
+        "cdk expired",
+        "cdk已过期",
+        "cdk 已过期",
+    )
+
+    return any(message in normalized for message in expired_messages)
+
+
+def text_has_invalid_cdk(text):
+    normalized = " ".join((text or "").lower().split())
+
+    invalid_messages = (
+        "cdk does not exist",
+        "cdk not exist",
+    )
+
+    return any(message in normalized for message in invalid_messages)
+
+
+async def safe_body_text(page):
+    try:
+        return await page.locator("body").inner_text()
+    except Exception:
+        return ""
+
+
+async def get_page_codes(page, digits, ignored_values=None):
+    """
+    Return all matching codes currently visible in inputs and page text.
+    """
+    ignored_values = {
+        str(value).strip()
+        for value in (ignored_values or set())
+        if value is not None
+    }
+
+    found = []
+    pattern = re.compile(rf"\b\d{{{digits}}}\b")
+    exact_pattern = re.compile(rf"\d{{{digits}}}")
+
+    try:
+        inputs = await page.locator("input").all()
+
+        for input_element in inputs:
+            try:
+                value = (await input_element.input_value()).strip()
+
+                if (
+                    exact_pattern.fullmatch(value)
+                    and value not in ignored_values
+                    and value not in found
+                ):
+                    found.append(value)
+
+            except Exception:
+                continue
+
+    except Exception:
+        pass
+
+    body_text = await safe_body_text(page)
+
+    for value in pattern.findall(body_text):
+        if value not in ignored_values and value not in found:
+            found.append(value)
+
+    return found
+
+
+async def wait_until_account_page_ready(page, timeout_seconds=15):
+    """
+    Wait until the account page is ready, invalid, or expired.
+    """
+    deadline = time.monotonic() + timeout_seconds
+
+    while time.monotonic() < deadline:
+        body_text = await safe_body_text(page)
+        body_lower = body_text.lower()
+
+        if text_has_invalid_cdk(body_text):
+            return False, INCORRECT_ACCOUNT_ERROR
+
+        if text_has_expired_cdk(body_text):
+            return False, EXPIRED_CDK_ERROR
+
+        if "click replace" in body_lower:
+            return True, None
+
+        await page.wait_for_timeout(250)
+
+    return False, "Unable to verify account. Please try again."
+
+
+async def close_initial_modal(page):
+    """
+    Close the initial blocking modal shown before Click Replace, if present.
+    """
+    try:
+        modal_buttons = page.locator(".ant-modal-confirm-btns button")
+
+        if await modal_buttons.count() > 0:
+            await modal_buttons.last.click(timeout=5000)
+            await page.wait_for_timeout(500)
+
+    except Exception:
+        pass
+
+
+async def click_replace_and_confirm(page):
+    """
+    Perform only:
+        Click Replace -> OK
+
+    Expiry and code detection happen together afterward.
+    """
+    try:
+        await page.get_by_text(
+            "Click Replace",
+            exact=True
+        ).click(
+            timeout=8000,
+            force=True
+        )
+
+    except Exception:
+        return False, "Unable to click Replace. Please try again."
+
+    await page.wait_for_timeout(350)
+
+    try:
+        await page.get_by_text(
+            "OK",
+            exact=True
+        ).last.click(timeout=8000)
+
+        return True, None
+
+    except Exception:
+        pass
+
+    try:
+        modal_buttons = page.locator(".ant-modal-confirm-btns button")
+
+        if await modal_buttons.count() > 0:
+            await modal_buttons.last.click(timeout=5000)
+            return True, None
+
+    except Exception:
+        pass
+
+    return False, "Unable to confirm the request. Please try again."
+
+
+async def wait_for_code_or_error(
+    page,
+    digits,
+    ignored_values=None,
+    previous_codes=None,
+    timeout_seconds=30,
+):
+    """
+    Poll the page and return whichever appears first:
+
+    - expired CDK
+    - invalid CDK
+    - requested code
+    - explicit no-code message
+    - timeout
+
+    previous_codes prevents an old value already visible before clicking
+    Replace from being returned as a newly retrieved code.
+    """
+    ignored_values = {
+        str(value).strip()
+        for value in (ignored_values or set())
+        if value is not None
+    }
+    previous_codes = set(previous_codes or [])
+    deadline = time.monotonic() + timeout_seconds
+
+    while time.monotonic() < deadline:
+        body_text = await safe_body_text(page)
+        body_lower = body_text.lower()
+
+        if text_has_expired_cdk(body_text):
+            return "expired", None
+
+        if text_has_invalid_cdk(body_text):
+            return "invalid", None
+
+        if (
+            "we have not received the latest verification code"
+            in body_lower
+        ):
+            return "no_code", None
+
+        current_codes = await get_page_codes(
+            page,
+            digits,
+            ignored_values=ignored_values,
+        )
+
+        new_codes = [
+            value
+            for value in current_codes
+            if value not in previous_codes
+        ]
+
+        if new_codes:
+            return "code", new_codes[0]
+
+        # If the page explicitly reports success, accept the current code,
+        # even when the same value happened to be visible before the click.
+        if "successfully obtained verification code" in body_lower:
+            if current_codes:
+                return "code", current_codes[0]
+
+        await page.wait_for_timeout(250)
+
+    return "timeout", None
+
+
+# =========================================================
+# 4-DIGIT SIGN-IN CODE
+# =========================================================
+
 def get_auto_sign_in_code(account_email, account_password):
-    return asyncio.run(_get_auto_sign_in_code_async(account_email, account_password))
+    return asyncio.run(
+        _get_auto_sign_in_code_async(
+            account_email,
+            account_password,
+        )
+    )
 
-async def _get_auto_sign_in_code_async(account_email, account_password):
-    real_password = account_password.strip()
 
-    if real_password == "qwe222":
-        found_password = False
-        try:
-            with open("password.txt", "r", encoding="utf-8") as f:
-                for line in f:
-                    parts = re.split(r"\s+", line.strip())
-                    if len(parts) >= 2 and parts[0].lower() == account_email.strip().lower():
-                        real_password = parts[1]
-                        found_password = True
-                        break
+async def _get_auto_sign_in_code_async(
+    account_email,
+    account_password,
+):
+    account_email = (account_email or "").strip()
+    account_password = (account_password or "").strip()
 
-            if not found_password:
-                return None, "Email not updated. Please ask admin to update."
+    real_password, password_error = resolve_account_password(
+        account_email,
+        account_password,
+    )
 
-        except Exception as e:
-            return None, f"Unable to read password.txt: {str(e)}"
+    if password_error:
+        return None, password_error
 
-    query_text = f"{account_email.strip()}----{real_password}"
+    query_text = f"{account_email}----{real_password}"
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(
             headless=True,
             args=[
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled"
-            ]
+                "--disable-blink-features=AutomationControlled",
+            ],
         )
 
         try:
             context = await browser.new_context(
                 viewport={"width": 1400, "height": 900},
-                locale="en-US"
+                locale="en-US",
             )
 
             page = await context.new_page()
             page.set_default_timeout(30000)
 
             cdk_value = quote(query_text, safe="")
-            auto_url = f"https://yzmen.4knaifei.cn//#/?cdk={cdk_value}"
-            
+            auto_url = (
+                "https://yzmen.4knaifei.cn//#/?cdk="
+                f"{cdk_value}"
+            )
+
             await page.goto(
                 auto_url,
                 wait_until="domcontentloaded",
-                timeout=45000
+                timeout=45000,
             )
 
-            result = None
-            start_time = time.time()
+            ready, ready_error = await wait_until_account_page_ready(page)
 
-            while time.time() - start_time < 15:
-                body_text = await page.locator("body").inner_text()
+            if not ready:
+                return None, ready_error
 
-                if "CDK Does Not Exist" in body_text:
-                    return None, "Email or Password incorrect. Please check and try again."
+            await close_initial_modal(page)
 
-                if "Click Replace" in body_text:
-                    result = "replace"
-                    break
+            previous_codes = await get_page_codes(page, 4)
 
-                await page.wait_for_timeout(500)
+            clicked, click_error = await click_replace_and_confirm(page)
 
-            if result != "replace":
-                return None, "Unable to verify account. Please try again."
+            if not clicked:
+                return None, click_error
 
-            try:
-                ok_btn = page.locator(".ant-modal-confirm-btns button").last
-                if await ok_btn.count() > 0:
-                    await ok_btn.click(timeout=5000)
-                    await page.wait_for_timeout(1000)
-            except Exception:
-                pass
+            result_type, result_value = await wait_for_code_or_error(
+                page,
+                digits=4,
+                previous_codes=previous_codes,
+                timeout_seconds=30,
+            )
 
-            await page.get_by_text("Click Replace", exact=True).click(timeout=8000, force=True)
+            if result_type == "expired":
+                return None, EXPIRED_CDK_ERROR
 
-            try:
-                await page.get_by_text("OK", exact=True).click(timeout=8000)
-            except Exception:
-                pass
+            if result_type == "invalid":
+                return None, INCORRECT_ACCOUNT_ERROR
 
-            try:
-                await page.wait_for_function(
-                    """
-                    () => {
-                        const text = document.body.innerText || "";
-                        return (
-                            text.includes("Successfully obtained verification code") ||
-                            text.includes("We have not received the latest verification code")
-                        );
-                    }
-                    """,
-                    timeout=30000
+            if result_type == "code":
+                return result_value, None
+
+            if result_type == "no_code":
+                return (
+                    None,
+                    "No new code received. Please send the "
+                    "sign-in code first.",
                 )
-            except Exception:
-                pass
 
-            final_text = await page.locator("body").inner_text()
+            return (
+                None,
+                "No 4-digit code found. Please send the sign-in "
+                "code first and try again.",
+            )
 
-            latest_code = None
-
-            inputs = await page.locator("input").all()
-            for inp in inputs:
-                try:
-                    value = (await inp.input_value()).strip()
-                    if re.fullmatch(r"\d{4}", value):
-                        latest_code = value
-                        break
-                except Exception:
-                    pass
-
-            if latest_code:
-                return latest_code, None
-
-            if "We have not received the latest verification code" in final_text:
-                return None, "No new code received. Please send the sign-in code first."
-
-            return None, "No 4-digit code found. Please send the sign-in code first and try again."
-
-        except Exception as e:
-            return None, f"System error: {str(e)}"
+        except Exception as exc:
+            return None, f"System error: {str(exc)}"
 
         finally:
             await browser.close()
@@ -465,187 +715,133 @@ async def _get_outlook_household_code_async(user_email):
         finally:
             await browser.close()
 
-# ---------------- 6-DIGIT VERIFICATION CODE ----------------
+# =========================================================
+# 6-DIGIT VERIFICATION CODE
+# =========================================================
+
 def get_verification_code(account_email, account_password):
     return asyncio.run(
-        _get_verification_code_async(account_email, account_password)
+        _get_verification_code_async(
+            account_email,
+            account_password,
+        )
     )
 
 
-async def _get_verification_code_async(account_email, account_password):
-    real_password = account_password.strip()
+async def _get_verification_code_async(
+    account_email,
+    account_password,
+):
+    account_email = (account_email or "").strip()
+    account_password = (account_password or "").strip()
 
-    if real_password == "qwe222":
-        found_password = False
+    real_password, password_error = resolve_account_password(
+        account_email,
+        account_password,
+    )
 
-        try:
-            with open("password.txt", "r", encoding="utf-8") as f:
-                for line in f:
-                    parts = re.split(r"\s+", line.strip())
+    if password_error:
+        return None, password_error
 
-                    if (
-                        len(parts) >= 2
-                        and parts[0].lower() == account_email.strip().lower()
-                    ):
-                        real_password = parts[1]
-                        found_password = True
-                        break
+    query_text = f"{account_email}----{real_password}"
 
-            if not found_password:
-                return None, "Email not updated. Please ask admin to update."
+    ignored_values = {
+        real_password.strip(),
+        account_password.strip(),
+    }
 
-        except Exception as e:
-            return None, f"Unable to read password.txt: {str(e)}"
-
-    query_text = f"{account_email.strip()}----{real_password}"
-
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(
             headless=True,
             args=[
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled"
-            ]
+                "--disable-blink-features=AutomationControlled",
+            ],
         )
 
         try:
             context = await browser.new_context(
                 viewport={"width": 1400, "height": 900},
-                locale="en-US"
+                locale="en-US",
             )
 
             page = await context.new_page()
             page.set_default_timeout(30000)
 
             cdk_value = quote(query_text, safe="")
-            auto_url = f"https://yzmen.4knaifei.cn//#/?cdk={cdk_value}"
+            auto_url = (
+                "https://yzmen.4knaifei.cn//#/?cdk="
+                f"{cdk_value}"
+            )
 
             await page.goto(
                 auto_url,
                 wait_until="domcontentloaded",
-                timeout=45000
+                timeout=45000,
             )
 
-            # Wait until account opens
-            result = None
-            start_time = time.time()
+            ready, ready_error = await wait_until_account_page_ready(page)
 
-            while time.time() - start_time < 15:
-                body_text = await page.locator("body").inner_text()
+            if not ready:
+                return None, ready_error
 
-                if "CDK Does Not Exist" in body_text:
-                    return None, "Email or Password incorrect. Please check and try again."
-
-                if "Click Replace" in body_text:
-                    result = "replace"
-                    break
-
-                await page.wait_for_timeout(500)
-
-            if result != "replace":
-                return None, "Unable to verify account. Please try again."
-
-            # Close blocking modal if exists
-            try:
-                ok_btn = page.locator(".ant-modal-confirm-btns button").last
-                if await ok_btn.count() > 0:
-                    await ok_btn.click(timeout=5000)
-                    await page.wait_for_timeout(800)
-            except Exception:
-                pass
-
-            async def find_6_digit_code():
-                await page.wait_for_timeout(1200)
-
-                final_text = await page.locator("body").inner_text()
-
-                ignored = {
-                    real_password,
-                    account_password.strip()
-                }
-
-                # Check input fields first
-                inputs = await page.locator("input").all()
-
-                for inp in inputs:
-                    try:
-                        value = (await inp.input_value()).strip()
-
-                        if (
-                            re.fullmatch(r"\d{6}", value)
-                            and value not in ignored
-                        ):
-                            return value
-                    except Exception:
-                        pass
-
-                # Check full visible page text / history table
-                matches = re.findall(r"\b\d{6}\b", final_text)
-
-                for code in matches:
-                    if code in ignored:
-                        continue
-
-                    return code
-
-                return None
+            await close_initial_modal(page)
 
             max_attempts = 5
 
             for attempt in range(max_attempts):
-
-                # Always click replace first
-                await page.get_by_text("Click Replace", exact=True).click(
-                    timeout=8000,
-                    force=True
+                previous_codes = await get_page_codes(
+                    page,
+                    6,
+                    ignored_values=ignored_values,
                 )
 
-                # Click OK popup if shown
-                try:
-                    await page.get_by_text("OK", exact=True).click(timeout=8000)
-                except Exception:
-                    pass
+                clicked, click_error = await click_replace_and_confirm(page)
 
-                # Wait for success or no-code result
-                try:
-                    await page.wait_for_function(
-                        """
-                        () => {
-                            const text = document.body.innerText || "";
-                            return (
-                                text.includes("Successfully obtained verification code") ||
-                                text.includes("We have not received the latest verification code") ||
-                                text.includes("Click Replace")
-                            );
-                        }
-                        """,
-                        timeout=20000
+                if not clicked:
+                    return None, click_error
+
+                result_type, result_value = await wait_for_code_or_error(
+                    page,
+                    digits=6,
+                    ignored_values=ignored_values,
+                    previous_codes=previous_codes,
+                    timeout_seconds=20,
+                )
+
+                if result_type == "expired":
+                    return None, EXPIRED_CDK_ERROR
+
+                if result_type == "invalid":
+                    return None, INCORRECT_ACCOUNT_ERROR
+
+                if result_type == "code":
+                    return result_value, None
+
+                if result_type == "no_code":
+                    return (
+                        None,
+                        "No 6-digit verification code found. "
+                        "Please request a new verification code "
+                        "and try again.",
                     )
-                except Exception:
-                    pass
 
-                await page.wait_for_timeout(1500)
+                if attempt < max_attempts - 1:
+                    await page.wait_for_timeout(800)
 
-                latest_code = await find_6_digit_code()
+            return (
+                None,
+                "No 6-digit verification code found after "
+                "multiple attempts.",
+            )
 
-                if latest_code:
-                    return latest_code, None
-
-                final_text = await page.locator("body").inner_text()
-
-                if "We have not received the latest verification code" in final_text:
-                    return None, "No 6-digit verification code found."
-
-                await page.wait_for_timeout(800)
-
-            return None, "No 6-digit verification code found after multiple attempts."
-
-        except Exception as e:
-            return None, f"System error: {str(e)}"
+        except Exception as exc:
+            return None, f"System error: {str(exc)}"
 
         finally:
             await browser.close()
+
 # ---------------- HOUSEHOLD CODE ----------------
 def _extract_code_from_verification_link(url: str):
     """Follow Netflix 'Temporary Access Code' link and get the OTP."""
