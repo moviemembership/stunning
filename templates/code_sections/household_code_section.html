@@ -114,7 +114,12 @@
       Retrieve Household Code
     </div>
 
-    <form method="POST" id="code-form">
+    <form
+      method="POST"
+      action="{{ url_for('get_code') }}?type=household"
+      class="code-form">
+    
+      <input type="hidden" name="code_type" value="household">
 
       <label class="outlook-label">
         Enter Outlook / Hotmail Email:
