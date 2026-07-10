@@ -1113,11 +1113,11 @@ def private_profile_checkout():
         total=total
     )
 
-@app.route("/get-code")
+@app.route("/get-code", methods=["GET", "POST"])
 def get_code():
     selected = request.args.get("type", "signin")
 
-    if selected not in ["signin", "verification", "household"]:
+    if selected not in {"signin", "verification", "household"}:
         selected = "signin"
 
     return render_template(
