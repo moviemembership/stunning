@@ -1117,12 +1117,61 @@ def private_profile_checkout():
 def get_code():
     selected = request.args.get("type", "signin")
 
+    email_value = ""
+    password_value = ""
+    code = None
+    error = None
+
+    if request.method == "POST":
+        selected = request.form.get("code_type", "signin")
+        email_value = (request.form.get("email") or "").strip()
+        password_value = (request.form.get("password") or "").strip()
+
+        if selected == "signin":
+            if not email_value or not password_value:
+                error = "Please enter both email and password."
+            else:
+                code, error = get_auto_sign_in_code(
+                    email_value,
+                    password_value
+                )
+
+        elif selected == "verification":
+            if not email_value or not password_value:
+                error = "Please enter both email and password."
+            else:
+                try:
+                    code, error = get_verification_code(
+                        email_value,
+                        password_value
+                    )
+                except Exception as e:
+                    app.logger.exception(
+                        "Verification code error: %s",
+                        e
+                    )
+                    error = "System is busy or timed out. Please try again."
+
+        elif selected == "household":
+            if not email_value:
+                error = "Please enter the account email."
+            else:
+                code, error = get_outlook_household_code(email_value)
+
+        else:
+            selected = "signin"
+            error = "Invalid code type."
+
     if selected not in {"signin", "verification", "household"}:
         selected = "signin"
 
     return render_template(
         "get_code.html",
-        selected=selected
+        selected=selected,
+        email=email_value,
+        password=password_value,
+        code=code,
+        error=error
     )
 
 # ---------------- MAIN ----------------
