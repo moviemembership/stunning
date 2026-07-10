@@ -3,7 +3,12 @@
 
     <h2 class="outlook-title">Get Sign-In Code</h2>
 
-    <form method="POST" id="code-form">
+    <form
+      method="POST"
+      action="{{ url_for('get_code') }}?type=signin"
+      class="code-form">
+
+    <input type="hidden" name="code_type" value="signin">
 
       <label class="outlook-label">Account Email:</label>
       <input class="outlook-input" type="email" name="email"
