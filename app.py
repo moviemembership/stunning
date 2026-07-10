@@ -1021,7 +1021,7 @@ def profile_compare():
     return render_template("profile_compare.html")
 
 @app.route("/profile-comparision")
-def profile_compare():
+def profile_comparison():
     return render_template("profile_comparision.html")
 
 @app.errorhandler(404)
