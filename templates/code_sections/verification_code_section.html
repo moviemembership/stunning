@@ -258,9 +258,9 @@ document.addEventListener("DOMContentLoaded", function () {
   const button = document.getElementById("submitBtn");
   const loading = document.getElementById("loading");
   const progressWrapper = document.getElementById("progressWrapper");
-  const progressBar = document.getElementById("progressBar");
-  const progressPercent = document.getElementById("progressPercent");
-  const progressStep = document.getElementById("progressStep");
+  const progressBar = form.querySelector(".progress-bar");
+  const progressPercent = form.querySelector(".progress-percent");
+  const progressStep = form.querySelector(".progress-step");
 
   let submitted = false;
 
@@ -291,9 +291,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function updateProgress() {
       if (index < steps.length) {
-        progressBar.style.width = steps[index].percent + "%";
-        progressPercent.innerText = steps[index].percent + "%";
-        progressStep.innerText = steps[index].text;
+        progressBar.style.width = step.percent + "%";
+        progressPercent.textContent = step.percent + "%";
+        progressStep.textContent = step.text;
         index++;
         setTimeout(updateProgress, 6000);
       }
