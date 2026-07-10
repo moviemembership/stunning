@@ -42,9 +42,6 @@
         Buy Now
       </button>
 
-      <p class="note">
-        After clicking Buy Now, the message will be copied and you will be redirected to Telegram.
-      </p>
 
     </div>
 
@@ -252,7 +249,7 @@ function plusQty(){
 
 function buyNow(){
   const message = "Hello, I'm interested in " + qty + " Netflix Private Profile";
-  const telegramLink = "https://t.me/movie_membership";
+  const telegramLink = "https://mantapnet.my/superlink";
 
   navigator.clipboard.writeText(message).finally(function(){
     window.location.href = telegramLink;
