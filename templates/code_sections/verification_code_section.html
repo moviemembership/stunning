@@ -41,11 +41,11 @@
 
     </form>
 
-    {% if email %}
+    {% if selected == "verification" and email %}
       <div class="email-box">Entered email: {{ email }}</div>
     {% endif %}
 
-    {% if code %}
+    {% if selected == "verification" and code %}
       <div class="code-box" id="codeValue">{{ code }}</div>
     
       <p class="success-text">
@@ -63,7 +63,7 @@
       </div>
     {% endif %}
 
-    {% if error %}
+    {% if selected == "verification" and error %}
       <div class="error-box">{{ error }}</div>
     {% endif %}
 
