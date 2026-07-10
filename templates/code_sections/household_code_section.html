@@ -143,19 +143,19 @@
 
     </form>
 
-    {% if email %}
+    {% if selected == "household" and email %}
       <div class="email-box">
         Entered email: {{ email }}
       </div>
     {% endif %}
 
-    {% if code %}
+    {% if selected == "household" and code %}
       <div class="code-box">
         {{ code }}
       </div>
     {% endif %}
 
-    {% if error %}
+    {% if selected == "household" and error %}
       <div class="error-box">
         {{ error }}
       </div>
