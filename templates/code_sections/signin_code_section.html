@@ -39,12 +39,16 @@
 
     </form>
 
-    {% if email %}
-      <div class="email-box">Entered email: {{ email }}</div>
-    {% endif %}
+    {% if selected == "signin" and email %}
+  <div class="email-box">
+    Entered email: {{ email }}
+  </div>
+{% endif %}
 
-    {% if code %}
-      <div class="code-box" id="codeValue">{{ code }}</div>
+    {% if selected == "signin" and code %}
+      <div class="code-box" id="codeValue">
+        {{ code }}
+      </div>
     
       <p class="success-text">
         Please use the latest sign-in code. Make sure the sign-in code was sent before attempting to get the code.
@@ -52,20 +56,21 @@
     
       <div class="code-actions">
     
-      <button class="copy-btn" type="button" onclick="copyCode()">
-        Copy Code
-      </button>
-      
-      <button class="wrong-btn" type="button" onclick="wrongCode()">
-        Wrong Code
-      </button>
+        <button class="copy-btn" type="button" onclick="copyCode()">
+          Copy Code
+        </button>
+    
+        <button class="wrong-btn" type="button" onclick="wrongCode()">
+          Wrong Code
+        </button>
     
       </div>
-    
     {% endif %}
-
-    {% if error %}
-      <div class="error-box">{{ error }}</div>
+    
+    {% if selected == "signin" and error %}
+      <div class="error-box">
+        {{ error }}
+      </div>
     {% endif %}
 
     <div class="instruction-box">
