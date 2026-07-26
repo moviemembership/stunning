@@ -152,6 +152,7 @@ def get_mantapnet_email_code(
         for subject in subjects:
             criteria = (
                 f'(SINCE {since_date} '
+                f'TO "{entered_email}" '
                 f'SUBJECT "{subject}")'
             )
 
@@ -253,21 +254,25 @@ def get_mantapnet_email_code(
             message = email.message_from_bytes(
                 body_data[0][1]
             )
-
+            
             body = _extract_email_body(message) or ""
-
-            # The email must belong to the entered account.
-            if entered_email not in body.lower():
+            
+            to_header = (
+                message.get("To")
+                or message_header.get("To")
+                or ""
+            ).lower()
+            
+            if entered_email not in to_header:
                 continue
-
-            # Remove HTML tags before looking for the code.
+            
             readable_body = BeautifulSoup(
                 body,
                 "html.parser"
             ).get_text(" ")
-
+            
             match = code_pattern.search(readable_body)
-
+            
             if match:
                 return match.group(0), None
 
