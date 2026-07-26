@@ -117,6 +117,208 @@ def _extract_email_body(msg):
     except Exception:
         return ""
 
+def get_mantapnet_email_code(
+    entered_email,
+    subjects,
+    digits,
+    max_age_minutes=25
+):
+    """
+    Search the Mantapnet inbox for the newest email matching:
+    - one of the supplied subjects
+    - the entered Mantapnet email inside the message
+    - a code with the requested number of digits
+
+    Returns:
+        (code, error)
+    """
+    entered_email = (entered_email or "").strip().lower()
+
+    if not entered_email.endswith("@mantapnet.com"):
+        return None, "Please enter a valid @mantapnet.com email."
+
+    mail = None
+
+    try:
+        mail = imap_connect()
+
+        since_date = (
+            datetime.now(UTC) - timedelta(days=1)
+        ).strftime("%d-%b-%Y")
+
+        all_uids = []
+
+        # Search each possible English/Malay subject separately.
+        for subject in subjects:
+            criteria = (
+                f'(SINCE {since_date} '
+                f'SUBJECT "{subject}")'
+            )
+
+            mail, (status, data) = imap_uid_safe(
+                mail,
+                "search",
+                None,
+                criteria
+            )
+
+            if (
+                status == "OK"
+                and data
+                and data[0]
+            ):
+                all_uids.extend(data[0].split())
+
+        # Remove duplicate UIDs while preserving order.
+        unique_uids = list(dict.fromkeys(all_uids))
+
+        if not unique_uids:
+            return None, "No recent code email found."
+
+        cutoff = (
+            datetime.now(UTC)
+            - timedelta(minutes=max_age_minutes)
+        )
+
+        code_pattern = re.compile(
+            rf"\b\d{{{digits}}}\b"
+        )
+
+        # Search newest emails first.
+        for index, uid in enumerate(
+            reversed(unique_uids[-100:]),
+            start=1
+        ):
+            # Keep IMAP connection alive.
+            if index % 8 == 0:
+                try:
+                    mail.noop()
+                except Exception:
+                    mail = imap_connect()
+
+            # Read Date and Subject first.
+            mail, (header_status, header_data) = (
+                imap_uid_safe(
+                    mail,
+                    "fetch",
+                    uid,
+                    (
+                        "(BODY.PEEK[HEADER.FIELDS "
+                        "(DATE SUBJECT TO FROM)])"
+                    )
+                )
+            )
+
+            if (
+                header_status != "OK"
+                or not header_data
+                or not header_data[0]
+            ):
+                continue
+
+            message_header = email.message_from_bytes(
+                header_data[0][1]
+            )
+
+            date_tuple = email.utils.parsedate_tz(
+                message_header.get("Date")
+            )
+
+            if date_tuple:
+                sent_utc = datetime.fromtimestamp(
+                    email.utils.mktime_tz(date_tuple),
+                    tz=UTC
+                )
+
+                if sent_utc < cutoff:
+                    continue
+
+            # Read full email so HTML/plain messages both work.
+            mail, (body_status, body_data) = (
+                imap_uid_safe(
+                    mail,
+                    "fetch",
+                    uid,
+                    "(BODY.PEEK[])"
+                )
+            )
+
+            if (
+                body_status != "OK"
+                or not body_data
+                or not body_data[0]
+            ):
+                continue
+
+            message = email.message_from_bytes(
+                body_data[0][1]
+            )
+
+            body = _extract_email_body(message) or ""
+
+            # The email must belong to the entered account.
+            if entered_email not in body.lower():
+                continue
+
+            # Remove HTML tags before looking for the code.
+            readable_body = BeautifulSoup(
+                body,
+                "html.parser"
+            ).get_text(" ")
+
+            match = code_pattern.search(readable_body)
+
+            if match:
+                return match.group(0), None
+
+        return (
+            None,
+            f"No recent {digits}-digit code found for this "
+            f"email. Request a new code and try again within "
+            f"{max_age_minutes} minutes."
+        )
+
+    except Exception as exc:
+        app.logger.exception(
+            "Mantapnet email code error: %s",
+            exc
+        )
+
+        return None, (
+            "Unable to check the mailbox right now. "
+            "Please try again."
+        )
+
+    finally:
+        if mail:
+            try:
+                mail.logout()
+            except Exception:
+                pass
+
+def get_mantapnet_signin_code(entered_email):
+    return get_mantapnet_email_code(
+        entered_email=entered_email,
+        subjects=[
+            "Your sign-in code",
+            "Kod daftar masuk anda"
+        ],
+        digits=4,
+        max_age_minutes=25
+    )
+
+
+def get_mantapnet_verification_code(entered_email):
+    return get_mantapnet_email_code(
+        entered_email=entered_email,
+        subjects=[
+            "Your verification code",
+            "Kod pengesahan anda"
+        ],
+        digits=6,
+        max_age_minutes=25
+    )
+
 # ---------------- SIGN IN CODE BROWSERS ----------------#
 
 # ---------------- HOME ----------------
@@ -1311,7 +1513,19 @@ def private_profile_checkout():
 
 @app.route("/get-code", methods=["GET", "POST"])
 def get_code():
-    selected = request.args.get("type", "signin")
+    selected = request.args.get(
+        "type",
+        "signin"
+    )
+
+    valid_types = {
+        "signin",
+        "verification",
+        "household"
+    }
+
+    if selected not in valid_types:
+        selected = "signin"
 
     email_value = ""
     password_value = ""
@@ -1319,47 +1533,155 @@ def get_code():
     error = None
 
     if request.method == "POST":
-        selected = request.form.get("code_type", "signin")
-        email_value = (request.form.get("email") or "").strip()
-        password_value = (request.form.get("password") or "").strip()
+        selected = request.form.get(
+            "code_type",
+            "signin"
+        )
 
-        if selected == "signin":
-            if not email_value or not password_value:
-                error = "Please enter both email and password."
-            else:
-                code, error = get_auto_sign_in_code(
-                    email_value,
-                    password_value
-                )
-
-        elif selected == "verification":
-            if not email_value or not password_value:
-                error = "Please enter both email and password."
-            else:
-                try:
-                    code, error = get_verification_code(
-                        email_value,
-                        password_value
-                    )
-                except Exception as e:
-                    app.logger.exception(
-                        "Verification code error: %s",
-                        e
-                    )
-                    error = "System is busy or timed out. Please try again."
-
-        elif selected == "household":
-            if not email_value:
-                error = "Please enter the account email."
-            else:
-                code, error = get_outlook_household_code(email_value)
-
-        else:
+        if selected not in valid_types:
             selected = "signin"
             error = "Invalid code type."
 
-    if selected not in {"signin", "verification", "household"}:
-        selected = "signin"
+        email_value = (
+            request.form.get("email") or ""
+        ).strip()
+
+        password_value = (
+            request.form.get("password") or ""
+        ).strip()
+
+        email_lower = email_value.lower()
+
+        is_mantapnet_email = (
+            email_lower.endswith("@mantapnet.com")
+        )
+
+        if not error:
+
+            # =============================================
+            # SIGN-IN CODE
+            # =============================================
+            if selected == "signin":
+
+                if not email_value:
+                    error = "Please enter the account email."
+
+                elif is_mantapnet_email:
+                    # Mantapnet email:
+                    # use direct IMAP search, no password required.
+                    code, error = get_mantapnet_signin_code(
+                        email_value
+                    )
+
+                elif not password_value:
+                    error = (
+                        "Please enter both email and password."
+                    )
+
+                else:
+                    # Outlook/Hotmail/other accounts:
+                    # use your existing Playwright/CDK method.
+                    try:
+                        code, error = get_auto_sign_in_code(
+                            email_value,
+                            password_value
+                        )
+
+                    except Exception as exc:
+                        app.logger.exception(
+                            "Sign-in code error: %s",
+                            exc
+                        )
+
+                        error = (
+                            "System is busy or timed out. "
+                            "Please try again."
+                        )
+
+            # =============================================
+            # VERIFICATION CODE
+            # =============================================
+            elif selected == "verification":
+
+                if not email_value:
+                    error = "Please enter the account email."
+
+                elif is_mantapnet_email:
+                    # Search:
+                    # Your verification code
+                    # Kod pengesahan anda
+                    code, error = (
+                        get_mantapnet_verification_code(
+                            email_value
+                        )
+                    )
+
+                elif not password_value:
+                    error = (
+                        "Please enter both email and password."
+                    )
+
+                else:
+                    try:
+                        code, error = get_verification_code(
+                            email_value,
+                            password_value
+                        )
+
+                    except Exception as exc:
+                        app.logger.exception(
+                            "Verification code error: %s",
+                            exc
+                        )
+
+                        error = (
+                            "System is busy or timed out. "
+                            "Please try again."
+                        )
+
+            # =============================================
+            # HOUSEHOLD CODE
+            # =============================================
+            elif selected == "household":
+
+                if not email_value:
+                    error = "Please enter the account email."
+
+                elif is_mantapnet_email:
+                    # Use your existing Mantapnet household
+                    # mailbox method.
+                    try:
+                        code, error = household_code_from_mailbox(
+                            email_value
+                        )
+
+                    except NameError:
+                        # Use this only if you have not yet
+                        # extracted /household-code into a helper.
+                        error = (
+                            "The Mantapnet household helper has "
+                            "not been connected yet."
+                        )
+
+                else:
+                    # Outlook/Hotmail household method.
+                    try:
+                        code, error = (
+                            get_outlook_household_code(
+                                email_value
+                            )
+                        )
+
+                    except Exception as exc:
+                        app.logger.exception(
+                            "Household code error: %s",
+                            exc
+                        )
+
+                        error = (
+                            "System is busy or timed out. "
+                            "Please try again."
+                        )
 
     return render_template(
         "get_code.html",
