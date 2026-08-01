@@ -569,62 +569,187 @@ async def wait_until_account_page_ready(page, timeout_seconds=15):
 
 async def close_initial_modal(page):
     """
-    Close the initial blocking modal shown before Click Replace, if present.
+    Close only the initial informational modal.
+    Do not interfere with the Replace confirmation modal.
     """
     try:
-        modal_buttons = page.locator(".ant-modal-confirm-btns button")
+        modal = page.locator(
+            ".ant-modal-confirm:visible"
+        ).first
 
-        if await modal_buttons.count() > 0:
-            await modal_buttons.last.click(timeout=5000)
-            await page.wait_for_timeout(500)
+        if await modal.count() == 0:
+            return
 
-    except Exception:
-        pass
+        modal_text = (
+            await modal.inner_text()
+        ).lower()
+
+        # Do not close a Replace confirmation modal
+        if (
+            "replace" in modal_text
+            or "confirm" in modal_text
+        ):
+            return
+
+        buttons = modal.locator("button")
+
+        if await buttons.count() > 0:
+            button = buttons.last
+
+            if await button.is_visible():
+                await button.click(
+                    timeout=5000,
+                    force=True
+                )
+
+                await page.wait_for_timeout(500)
+
+    except Exception as exc:
+        app.logger.warning(
+            "Initial modal close skipped: %s",
+            exc
+        )
 
 
 async def click_replace_and_confirm(page):
     """
-    Perform only:
-        Click Replace -> OK
-
-    Expiry and code detection happen together afterward.
+    Click Replace and wait reliably for the confirmation modal.
+    Supports slower loading and different confirmation button text.
     """
+
+    # -----------------------------------------------------
+    # 1. Click the Replace button
+    # -----------------------------------------------------
     try:
-        await page.get_by_text(
+        replace_button = page.get_by_text(
             "Click Replace",
             exact=True
-        ).click(
-            timeout=8000,
+        )
+
+        await replace_button.wait_for(
+            state="visible",
+            timeout=15000
+        )
+
+        await replace_button.click(
+            timeout=15000,
             force=True
         )
 
-    except Exception:
-        return False, "Unable to click Replace. Please try again."
+    except Exception as exc:
+        app.logger.exception(
+            "Unable to click Replace: %s",
+            exc
+        )
 
-    await page.wait_for_timeout(350)
+        return False, (
+            "Unable to click Replace. "
+            "Please refresh and try again."
+        )
 
-    try:
-        await page.get_by_text(
+    # -----------------------------------------------------
+    # 2. Wait for the confirmation modal
+    # -----------------------------------------------------
+    confirmation_selectors = [
+        ".ant-modal-confirm-btns button.ant-btn-primary",
+        ".ant-modal-confirm-btns button",
+        ".ant-modal-footer button.ant-btn-primary",
+        ".ant-modal-footer button",
+        ".ant-popconfirm-buttons button.ant-btn-primary",
+        ".ant-popconfirm-buttons button",
+    ]
+
+    deadline = time.monotonic() + 15
+
+    while time.monotonic() < deadline:
+
+        # Detect account errors while waiting
+        body_text = await safe_body_text(page)
+
+        if text_has_expired_cdk(body_text):
+            return False, EXPIRED_CDK_ERROR
+
+        if text_has_invalid_cdk(body_text):
+            return False, INCORRECT_ACCOUNT_ERROR
+
+        # Try stable modal CSS selectors first
+        for selector in confirmation_selectors:
+            try:
+                buttons = page.locator(selector)
+                count = await buttons.count()
+
+                if count > 0:
+                    for index in reversed(range(count)):
+                        button = buttons.nth(index)
+
+                        try:
+                            if await button.is_visible():
+                                await button.click(
+                                    timeout=5000,
+                                    force=True
+                                )
+
+                                await page.wait_for_timeout(500)
+                                return True, None
+
+                        except Exception:
+                            continue
+
+            except Exception:
+                continue
+
+        # Try confirmation text alternatives
+        for button_text in [
             "OK",
-            exact=True
-        ).last.click(timeout=8000)
+            "Confirm",
+            "Yes",
+            "确定",
+            "确认",
+        ]:
+            try:
+                button = page.get_by_role(
+                    "button",
+                    name=button_text,
+                    exact=True
+                ).last
 
-        return True, None
+                if await button.is_visible():
+                    await button.click(
+                        timeout=5000,
+                        force=True
+                    )
 
-    except Exception:
-        pass
+                    await page.wait_for_timeout(500)
+                    return True, None
 
+            except Exception:
+                continue
+
+        await page.wait_for_timeout(300)
+
+    # -----------------------------------------------------
+    # 3. Save debugging information
+    # -----------------------------------------------------
     try:
-        modal_buttons = page.locator(".ant-modal-confirm-btns button")
+        timestamp = int(time.time())
 
-        if await modal_buttons.count() > 0:
-            await modal_buttons.last.click(timeout=5000)
-            return True, None
+        await page.screenshot(
+            path=f"/tmp/confirm_failed_{timestamp}.png",
+            full_page=True
+        )
+
+        app.logger.error(
+            "Confirmation failed. URL=%s Screenshot=%s",
+            page.url,
+            f"/tmp/confirm_failed_{timestamp}.png"
+        )
 
     except Exception:
         pass
 
-    return False, "Unable to confirm the request. Please try again."
+    return False, (
+        "Please request the code again and retry."
+    )
 
 
 async def wait_for_code_or_error(
