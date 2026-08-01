@@ -751,6 +751,47 @@ async def click_replace_and_confirm(page):
         "Please request the code again and retry."
     )
 
+async def get_current_code(page, digits):
+    """
+    Read only the current Code input.
+    Do not scan the history table.
+    """
+    try:
+        code_label = page.get_by_text(
+            re.compile(r"^\s*Code\s*:\s*$", re.I)
+        ).first
+
+        code_input = code_label.locator(
+            "xpath=following::input[1]"
+        )
+
+        if await code_input.count() > 0:
+            value = (
+                await code_input.input_value()
+            ).strip()
+
+            if re.fullmatch(rf"\d{{{digits}}}", value):
+                return value
+
+    except Exception:
+        pass
+
+    # Fallback: Account, Password, Code are the first 3 inputs
+    try:
+        inputs = page.locator("input:visible")
+
+        if await inputs.count() >= 3:
+            value = (
+                await inputs.nth(2).input_value()
+            ).strip()
+
+            if re.fullmatch(rf"\d{{{digits}}}", value):
+                return value
+
+    except Exception:
+        pass
+
+    return None
 
 async def wait_for_code_or_error(
     page,
@@ -759,24 +800,18 @@ async def wait_for_code_or_error(
     previous_codes=None,
     timeout_seconds=30,
 ):
-    """
-    Poll the page and return whichever appears first:
-
-    - expired CDK
-    - invalid CDK
-    - requested code
-    - explicit no-code message
-    - timeout
-
-    previous_codes prevents an old value already visible before clicking
-    Replace from being returned as a newly retrieved code.
-    """
     ignored_values = {
         str(value).strip()
         for value in (ignored_values or set())
         if value is not None
     }
-    previous_codes = set(previous_codes or [])
+
+    previous_codes = {
+        str(value).strip()
+        for value in (previous_codes or set())
+        if value is not None
+    }
+
     deadline = time.monotonic() + timeout_seconds
 
     while time.monotonic() < deadline:
@@ -792,31 +827,24 @@ async def wait_for_code_or_error(
         if (
             "we have not received the latest verification code"
             in body_lower
+            or "not received the latest verification code"
+            in body_lower
         ):
             return "no_code", None
 
-        current_codes = await get_page_codes(
+        current_code = await get_current_code(
             page,
-            digits,
-            ignored_values=ignored_values,
+            digits
         )
 
-        new_codes = [
-            value
-            for value in current_codes
-            if value not in previous_codes
-        ]
+        if (
+            current_code
+            and current_code not in ignored_values
+            and current_code not in previous_codes
+        ):
+            return "code", current_code
 
-        if new_codes:
-            return "code", new_codes[0]
-
-        # If the page explicitly reports success, accept the current code,
-        # even when the same value happened to be visible before the click.
-        if "successfully obtained verification code" in body_lower:
-            if current_codes:
-                return "code", current_codes[0]
-
-        await page.wait_for_timeout(250)
+        await page.wait_for_timeout(300)
 
     return "timeout", None
 
@@ -889,7 +917,11 @@ async def _get_auto_sign_in_code_async(
 
             await close_initial_modal(page)
 
-            previous_codes = await get_page_codes(page, 4)
+            previous_code = await get_current_code(page, 4)
+
+            previous_codes = {
+                previous_code
+            } if previous_code else set()
 
             clicked, click_error = await click_replace_and_confirm(page)
 
@@ -1123,11 +1155,11 @@ async def _get_verification_code_async(
             max_attempts = 5
 
             for attempt in range(max_attempts):
-                previous_codes = await get_page_codes(
-                    page,
-                    6,
-                    ignored_values=ignored_values,
-                )
+                previous_code = await get_current_code(page, 6)
+
+                previous_codes = {
+                    previous_code
+                } if previous_code else set()
 
                 clicked, click_error = await click_replace_and_confirm(page)
 
