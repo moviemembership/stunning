@@ -753,29 +753,26 @@ async def click_replace_and_confirm(page):
 
 async def get_current_code_state(page, digits):
     """
-    Read the current Code input and Collection Time directly
-    from their visible fields.
+    Read the main Code field and main Collection Time.
 
-    The history table is ignored.
+    This ignores the history table.
     """
     current_code = None
     collection_time = None
 
-    # =====================================================
-    # READ CURRENT CODE FIELD
-    # =====================================================
+    # -----------------------------------------------------
+    # Read the main Code input.
+    # Account = input 0
+    # Password = input 1
+    # Code = input 2
+    # -----------------------------------------------------
     try:
-        code_label = page.get_by_text(
-            re.compile(r"^\s*Code\s*:\s*$", re.I)
-        ).first
+        inputs = page.locator("input:visible")
+        input_count = await inputs.count()
 
-        code_input = code_label.locator(
-            "xpath=following::input[1]"
-        )
-
-        if await code_input.count() > 0:
+        if input_count >= 3:
             value = (
-                await code_input.input_value()
+                await inputs.nth(2).input_value()
             ).strip()
 
             if re.fullmatch(rf"\d{{{digits}}}", value):
@@ -783,97 +780,46 @@ async def get_current_code_state(page, digits):
 
     except Exception as exc:
         app.logger.warning(
-            "Unable to read current code through label: %s",
+            "Unable to read main Code input: %s",
             exc
         )
 
-    # Fallback: Account, Password and Code are first 3 inputs
-    if not current_code:
-        try:
-            visible_inputs = page.locator("input:visible")
-
-            if await visible_inputs.count() >= 3:
-                value = (
-                    await visible_inputs.nth(2).input_value()
-                ).strip()
-
-                if re.fullmatch(rf"\d{{{digits}}}", value):
-                    current_code = value
-
-        except Exception as exc:
-            app.logger.warning(
-                "Unable to read current code through inputs: %s",
-                exc
-            )
-
-    # =====================================================
-    # READ COLLECTION TIME DIRECTLY FROM THE LABEL
-    # =====================================================
+    # -----------------------------------------------------
+    # Read the main Collection Time from the page text.
+    # re.search returns the first Collection Time, which is
+    # the main one above the history table.
+    # -----------------------------------------------------
     try:
-        collection_label = page.get_by_text(
-            re.compile(
-                r"^\s*Collection\s*Time\s*:\s*$",
-                re.I
-            )
-        ).first
+        body_text = await safe_body_text(page)
 
-        if await collection_label.count() > 0:
-            # The time is normally in the next nearby element
-            nearby_text = await collection_label.locator(
-                "xpath=following::*[1]"
-            ).inner_text()
+        normalized_text = " ".join(
+            body_text
+            .replace("\xa0", " ")
+            .replace("\n", " ")
+            .split()
+        )
 
-            nearby_text = " ".join(
-                nearby_text.split()
-            )
+        match = re.search(
+            r"Collection\s*Time\s*:?\s*"
+            r"(\d{4}-\d{2}-\d{2}\s+"
+            r"\d{2}:\d{2}:\d{2})",
+            normalized_text,
+            re.I,
+        )
 
-            match = re.search(
-                r"\d{4}-\d{2}-\d{2}\s+"
-                r"\d{2}:\d{2}:\d{2}",
-                nearby_text
-            )
-
-            if match:
-                collection_time = match.group(0)
+        if match:
+            collection_time = match.group(1)
 
     except Exception as exc:
         app.logger.warning(
-            "Unable to read Collection Time through label: %s",
+            "Unable to read Collection Time: %s",
             exc
         )
 
-    # =====================================================
-    # FALLBACK: SEARCH PAGE TEXT
-    # =====================================================
-    if not collection_time:
-        try:
-            body_text = await safe_body_text(page)
-
-            normalized_text = " ".join(
-                body_text.replace("\xa0", " ").split()
-            )
-
-            match = re.search(
-                r"Collection\s*Time\s*:?\s*"
-                r"(\d{4}-\d{2}-\d{2}\s+"
-                r"\d{2}:\d{2}:\d{2})",
-                normalized_text,
-                re.I
-            )
-
-            if match:
-                collection_time = match.group(1)
-
-        except Exception as exc:
-            app.logger.warning(
-                "Unable to read Collection Time from page: %s",
-                exc
-            )
-
     app.logger.info(
-        "CURRENT CODE STATE: code=%s collection_time=%s",
+        "CODE STATE: code=%r collection_time=%r",
         current_code,
-        collection_time
+        collection_time,
     )
 
     return current_code, collection_time
@@ -884,12 +830,9 @@ def collection_time_is_recent(
     max_age_minutes=15,
 ):
     """
-    The external website's Collection Time is GMT+8.
+    The external website displays Collection Time in GMT+8.
     """
     if not collection_time:
-        app.logger.warning(
-            "Collection Time is empty or unreadable."
-        )
         return False
 
     try:
@@ -897,7 +840,7 @@ def collection_time_is_recent(
 
         collected_at = datetime.strptime(
             collection_time.strip(),
-            "%Y-%m-%d %H:%M:%S"
+            "%Y-%m-%d %H:%M:%S",
         ).replace(tzinfo=gmt8)
 
         current_time = datetime.now(gmt8)
@@ -907,20 +850,17 @@ def collection_time_is_recent(
         ).total_seconds()
 
         app.logger.info(
-            "CODE AGE CHECK: current=%s collected=%s "
-            "age_seconds=%s",
+            "CODE AGE: now=%s collected=%s age=%s",
             current_time.strftime("%Y-%m-%d %H:%M:%S"),
             collected_at.strftime("%Y-%m-%d %H:%M:%S"),
-            age_seconds
+            age_seconds,
         )
 
-        # Allow up to 2 minutes of clock difference
+        # Allow a small clock difference.
         if age_seconds < -120:
             return False
 
-        return age_seconds <= (
-            max_age_minutes * 60
-        )
+        return age_seconds <= max_age_minutes * 60
 
     except Exception as exc:
         app.logger.exception(
@@ -936,14 +876,13 @@ async def wait_for_code_or_error(
     timeout_seconds=30,
 ):
     """
-    Always wait for the Replace request result first.
+    After Replace -> OK:
 
-    When the external page reports no more verification codes,
-    allow a short grace period for the Code and Collection Time
-    fields to finish updating.
-
-    Return the current code only when its Collection Time is
-    within the last 15 minutes in GMT+8.
+    1. Keep checking the current Code and Collection Time.
+    2. Return the current code when its Collection Time is
+       within 15 minutes GMT+8.
+    3. Stop after the external page reports no more codes,
+       but allow the fields time to finish updating.
     """
     ignored_values = {
         str(value).strip()
@@ -952,6 +891,7 @@ async def wait_for_code_or_error(
     }
 
     deadline = time.monotonic() + timeout_seconds
+    no_more_detected_at = None
 
     no_code_messages = (
         "we have not received the latest verification code",
@@ -960,13 +900,6 @@ async def wait_for_code_or_error(
         "no more verification codes",
         "未收到最新验证码",
         "没有更多验证码",
-    )
-
-    success_messages = (
-        "successfully obtained verification code",
-        "verification code obtained successfully",
-        "验证码获取成功",
-        "成功获取验证码",
     )
 
     while time.monotonic() < deadline:
@@ -986,46 +919,37 @@ async def wait_for_code_or_error(
             for message in no_code_messages
         )
 
-        success = any(
-            message in body_lower
-            for message in success_messages
+        if no_more_code and no_more_detected_at is None:
+            no_more_detected_at = time.monotonic()
+
+        current_code, collection_time = (
+            await get_current_code_state(
+                page,
+                digits,
+            )
         )
 
-        if no_more_code or success:
-            # The notification may appear before the Code field
-            # and Collection Time finish updating.
-            grace_deadline = time.monotonic() + 5
+        if (
+            current_code
+            and current_code not in ignored_values
+            and collection_time_is_recent(
+                collection_time,
+                max_age_minutes=15,
+            )
+        ):
+            return "code", current_code
 
-            while time.monotonic() < grace_deadline:
-                current_code, collection_time = (
-                    await get_current_code_state(
-                        page,
-                        digits,
-                    )
-                )
-
-                if (
-                    current_code
-                    and current_code not in ignored_values
-                    and collection_time_is_recent(
-                        collection_time,
-                        max_age_minutes=15,
-                    )
-                ):
-                    return "code", current_code
-
-                await page.wait_for_timeout(300)
-
-            # After waiting, stop when the page says there
-            # are no more verification codes.
-            if no_more_code:
-                return "no_code", None
-
-            return "stale", None
+        # Once "no more code" appears, allow another 5 seconds
+        # for Code and Collection Time to finish updating.
+        if (
+            no_more_detected_at is not None
+            and time.monotonic() - no_more_detected_at >= 5
+        ):
+            return "no_code", None
 
         await page.wait_for_timeout(300)
 
-    # Final check in case the notification disappeared quickly.
+    # One final read before returning timeout.
     current_code, collection_time = (
         await get_current_code_state(
             page,
@@ -1044,7 +968,6 @@ async def wait_for_code_or_error(
         return "code", current_code
 
     return "timeout", None
-
 # =========================================================
 # 4-DIGIT SIGN-IN CODE
 # =========================================================
