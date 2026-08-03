@@ -800,7 +800,7 @@ async def get_current_code_state(page, digits):
         body_text = await safe_body_text(page)
 
         match = re.search(
-            r"Collection\s*Time\s*:\s*"
+            r"Collection\s*Time\s*:?\s*"
             r"(\d{4}-\d{2}-\d{2}\s+"
             r"\d{2}:\d{2}:\d{2})",
             body_text,
@@ -858,14 +858,14 @@ async def wait_for_code_or_error(
     timeout_seconds=30,
 ):
     """
-    After Replace has been clicked, wait for the external page to finish.
+    Always wait for the Replace request result first.
 
-    We do not reject a code before clicking Replace.
+    When the external page reports no more verification codes,
+    allow a short grace period for the Code and Collection Time
+    fields to finish updating.
 
-    When the page reports that there are no more verification codes,
-    stop and inspect the current code and Collection Time. Return the
-    latest code only when its Collection Time is within 15 minutes
-    in GMT+8.
+    Return the current code only when its Collection Time is
+    within the last 15 minutes in GMT+8.
     """
     ignored_values = {
         str(value).strip()
@@ -893,7 +893,9 @@ async def wait_for_code_or_error(
 
     while time.monotonic() < deadline:
         body_text = await safe_body_text(page)
-        body_lower = " ".join(body_text.lower().split())
+        body_lower = " ".join(
+            body_text.lower().split()
+        )
 
         if text_has_expired_cdk(body_text):
             return "expired", None
@@ -912,23 +914,32 @@ async def wait_for_code_or_error(
         )
 
         if no_more_code or success:
-            current_code, collection_time = (
-                await get_current_code_state(
-                    page,
-                    digits,
-                )
-            )
+            # The notification may appear before the Code field
+            # and Collection Time finish updating.
+            grace_deadline = time.monotonic() + 5
 
-            if (
-                current_code
-                and current_code not in ignored_values
-                and collection_time_is_recent(
-                    collection_time,
-                    max_age_minutes=15,
+            while time.monotonic() < grace_deadline:
+                current_code, collection_time = (
+                    await get_current_code_state(
+                        page,
+                        digits,
+                    )
                 )
-            ):
-                return "code", current_code
 
+                if (
+                    current_code
+                    and current_code not in ignored_values
+                    and collection_time_is_recent(
+                        collection_time,
+                        max_age_minutes=15,
+                    )
+                ):
+                    return "code", current_code
+
+                await page.wait_for_timeout(300)
+
+            # After waiting, stop when the page says there
+            # are no more verification codes.
             if no_more_code:
                 return "no_code", None
 
@@ -936,6 +947,7 @@ async def wait_for_code_or_error(
 
         await page.wait_for_timeout(300)
 
+    # Final check in case the notification disappeared quickly.
     current_code, collection_time = (
         await get_current_code_state(
             page,
@@ -954,7 +966,6 @@ async def wait_for_code_or_error(
         return "code", current_code
 
     return "timeout", None
-
 
 # =========================================================
 # 4-DIGIT SIGN-IN CODE
