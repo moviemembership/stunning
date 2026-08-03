@@ -753,14 +753,17 @@ async def click_replace_and_confirm(page):
 
 async def get_current_code_state(page, digits):
     """
-    Read only the current Code input and its Collection Time.
+    Read the current Code input and Collection Time directly
+    from their visible fields.
 
-    The external page displays Collection Time in GMT+8.
-    The history table is not used for choosing the code.
+    The history table is ignored.
     """
     current_code = None
     collection_time = None
 
+    # =====================================================
+    # READ CURRENT CODE FIELD
+    # =====================================================
     try:
         code_label = page.get_by_text(
             re.compile(r"^\s*Code\s*:\s*$", re.I)
@@ -778,40 +781,100 @@ async def get_current_code_state(page, digits):
             if re.fullmatch(rf"\d{{{digits}}}", value):
                 current_code = value
 
-    except Exception:
-        pass
+    except Exception as exc:
+        app.logger.warning(
+            "Unable to read current code through label: %s",
+            exc
+        )
 
+    # Fallback: Account, Password and Code are first 3 inputs
     if not current_code:
         try:
-            inputs = page.locator("input:visible")
+            visible_inputs = page.locator("input:visible")
 
-            if await inputs.count() >= 3:
+            if await visible_inputs.count() >= 3:
                 value = (
-                    await inputs.nth(2).input_value()
+                    await visible_inputs.nth(2).input_value()
                 ).strip()
 
                 if re.fullmatch(rf"\d{{{digits}}}", value):
                     current_code = value
 
-        except Exception:
-            pass
+        except Exception as exc:
+            app.logger.warning(
+                "Unable to read current code through inputs: %s",
+                exc
+            )
 
+    # =====================================================
+    # READ COLLECTION TIME DIRECTLY FROM THE LABEL
+    # =====================================================
     try:
-        body_text = await safe_body_text(page)
+        collection_label = page.get_by_text(
+            re.compile(
+                r"^\s*Collection\s*Time\s*:\s*$",
+                re.I
+            )
+        ).first
 
-        match = re.search(
-            r"Collection\s*Time\s*:?\s*"
-            r"(\d{4}-\d{2}-\d{2}\s+"
-            r"\d{2}:\d{2}:\d{2})",
-            body_text,
-            re.I,
+        if await collection_label.count() > 0:
+            # The time is normally in the next nearby element
+            nearby_text = await collection_label.locator(
+                "xpath=following::*[1]"
+            ).inner_text()
+
+            nearby_text = " ".join(
+                nearby_text.split()
+            )
+
+            match = re.search(
+                r"\d{4}-\d{2}-\d{2}\s+"
+                r"\d{2}:\d{2}:\d{2}",
+                nearby_text
+            )
+
+            if match:
+                collection_time = match.group(0)
+
+    except Exception as exc:
+        app.logger.warning(
+            "Unable to read Collection Time through label: %s",
+            exc
         )
 
-        if match:
-            collection_time = match.group(1).strip()
+    # =====================================================
+    # FALLBACK: SEARCH PAGE TEXT
+    # =====================================================
+    if not collection_time:
+        try:
+            body_text = await safe_body_text(page)
 
-    except Exception:
-        pass
+            normalized_text = " ".join(
+                body_text.replace("\xa0", " ").split()
+            )
+
+            match = re.search(
+                r"Collection\s*Time\s*:?\s*"
+                r"(\d{4}-\d{2}-\d{2}\s+"
+                r"\d{2}:\d{2}:\d{2})",
+                normalized_text,
+                re.I
+            )
+
+            if match:
+                collection_time = match.group(1)
+
+        except Exception as exc:
+            app.logger.warning(
+                "Unable to read Collection Time from page: %s",
+                exc
+            )
+
+    app.logger.info(
+        "CURRENT CODE STATE: code=%s collection_time=%s",
+        current_code,
+        collection_time
+    )
 
     return current_code, collection_time
 
@@ -821,34 +884,49 @@ def collection_time_is_recent(
     max_age_minutes=15,
 ):
     """
-    Treat the page's Collection Time as GMT+8 and return True only
-    when it is not older than max_age_minutes.
+    The external website's Collection Time is GMT+8.
     """
     if not collection_time:
+        app.logger.warning(
+            "Collection Time is empty or unreadable."
+        )
         return False
 
     try:
-        collected = datetime.strptime(
-            collection_time,
-            "%Y-%m-%d %H:%M:%S",
-        ).replace(
-            tzinfo=timezone(timedelta(hours=8))
+        gmt8 = timezone(timedelta(hours=8))
+
+        collected_at = datetime.strptime(
+            collection_time.strip(),
+            "%Y-%m-%d %H:%M:%S"
+        ).replace(tzinfo=gmt8)
+
+        current_time = datetime.now(gmt8)
+
+        age_seconds = (
+            current_time - collected_at
+        ).total_seconds()
+
+        app.logger.info(
+            "CODE AGE CHECK: current=%s collected=%s "
+            "age_seconds=%s",
+            current_time.strftime("%Y-%m-%d %H:%M:%S"),
+            collected_at.strftime("%Y-%m-%d %H:%M:%S"),
+            age_seconds
         )
 
-        now_gmt8 = datetime.now(
-            timezone(timedelta(hours=8))
-        )
-
-        age = now_gmt8 - collected
-
-        if age < timedelta(minutes=-2):
+        # Allow up to 2 minutes of clock difference
+        if age_seconds < -120:
             return False
 
-        return age <= timedelta(
-            minutes=max_age_minutes
+        return age_seconds <= (
+            max_age_minutes * 60
         )
 
-    except (TypeError, ValueError):
+    except Exception as exc:
+        app.logger.exception(
+            "Collection Time parsing failed: %s",
+            exc
+        )
         return False
 
 async def wait_for_code_or_error(
