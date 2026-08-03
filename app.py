@@ -500,474 +500,195 @@ async def safe_body_text(page):
         return ""
 
 
-async def get_page_codes(page, digits, ignored_values=None):
-    """
-    Return all matching codes currently visible in inputs and page text.
-    """
-    ignored_values = {
-        str(value).strip()
-        for value in (ignored_values or set())
-        if value is not None
-    }
-
-    found = []
-    pattern = re.compile(rf"\b\d{{{digits}}}\b")
-    exact_pattern = re.compile(rf"\d{{{digits}}}")
-
-    try:
-        inputs = await page.locator("input").all()
-
-        for input_element in inputs:
-            try:
-                value = (await input_element.input_value()).strip()
-
-                if (
-                    exact_pattern.fullmatch(value)
-                    and value not in ignored_values
-                    and value not in found
-                ):
-                    found.append(value)
-
-            except Exception:
-                continue
-
-    except Exception:
-        pass
-
-    body_text = await safe_body_text(page)
-
-    for value in pattern.findall(body_text):
-        if value not in ignored_values and value not in found:
-            found.append(value)
-
-    return found
+GMT8 = timezone(timedelta(hours=8))
 
 
-async def wait_until_account_page_ready(page, timeout_seconds=15):
-    """
-    Wait until the account page is ready, invalid, or expired.
-    """
+async def wait_until_account_page_ready(page, timeout_seconds=20):
     deadline = time.monotonic() + timeout_seconds
-
     while time.monotonic() < deadline:
         body_text = await safe_body_text(page)
-        body_lower = body_text.lower()
-
+        body_lower = " ".join(body_text.lower().split())
         if text_has_invalid_cdk(body_text):
             return False, INCORRECT_ACCOUNT_ERROR
-
         if text_has_expired_cdk(body_text):
             return False, EXPIRED_CDK_ERROR
-
         if "click replace" in body_lower:
             return True, None
-
         await page.wait_for_timeout(250)
-
     return False, "Unable to verify account. Please try again."
 
 
-async def close_initial_modal(page):
-    """
-    Close only the initial informational modal.
-    Do not interfere with the Replace confirmation modal.
-    """
+async def open_cdk_account(page, account_email, account_password):
+    login_value = f"{account_email}----{account_password}"
+    await page.goto(
+        "https://yzmen.4knaifei.cn//#/login",
+        wait_until="domcontentloaded",
+        timeout=45000,
+    )
+    login_input = page.locator("input:visible").first
+    await login_input.wait_for(state="visible", timeout=20000)
+    await login_input.fill(login_value)
+
+    exchange_clicked = False
+    for label in ("Exchange", "兑换", "Redeem", "Submit", "Login"):
+        try:
+            button = page.get_by_role(
+                "button",
+                name=re.compile(rf"^{re.escape(label)}$", re.I),
+            ).first
+            if await button.count() > 0 and await button.is_visible():
+                await button.click(timeout=10000, force=True)
+                exchange_clicked = True
+                break
+        except Exception:
+            continue
+
+    if not exchange_clicked:
+        try:
+            buttons = page.locator("button:visible")
+            if await buttons.count() > 0:
+                await buttons.last.click(timeout=10000, force=True)
+                exchange_clicked = True
+        except Exception:
+            pass
+
+    if not exchange_clicked:
+        return False, "Unable to click Exchange. Please try again."
+
+    return await wait_until_account_page_ready(page, timeout_seconds=20)
+
+
+async def click_replace_and_hint_ok(page):
+    try:
+        replace_button = page.get_by_role(
+            "button",
+            name="Click Replace",
+            exact=True,
+        )
+        await replace_button.wait_for(state="visible", timeout=15000)
+        await replace_button.click(timeout=15000, force=True)
+    except Exception as exc:
+        app.logger.exception("Unable to click Replace: %s", exc)
+        return False, "Unable to click Replace. Please try again."
+
     try:
         modal = page.locator(
-            ".ant-modal-confirm:visible"
-        ).first
-
-        if await modal.count() == 0:
-            return
-
-        modal_text = (
-            await modal.inner_text()
-        ).lower()
-
-        # Do not close a Replace confirmation modal
-        if (
-            "replace" in modal_text
-            or "confirm" in modal_text
-        ):
-            return
-
-        buttons = modal.locator("button")
-
-        if await buttons.count() > 0:
-            button = buttons.last
-
-            if await button.is_visible():
-                await button.click(
-                    timeout=5000,
-                    force=True
-                )
-
-                await page.wait_for_timeout(500)
-
-    except Exception as exc:
-        app.logger.warning(
-            "Initial modal close skipped: %s",
-            exc
-        )
-
-
-async def click_replace_and_confirm(page):
-    """
-    Click Replace and wait reliably for the confirmation modal.
-    Supports slower loading and different confirmation button text.
-    """
-
-    # -----------------------------------------------------
-    # 1. Click the Replace button
-    # -----------------------------------------------------
-    try:
-        replace_button = page.get_by_text(
-            "Click Replace",
-            exact=True
-        )
-
-        await replace_button.wait_for(
-            state="visible",
-            timeout=15000
-        )
-
-        await replace_button.click(
-            timeout=15000,
-            force=True
-        )
-
-    except Exception as exc:
-        app.logger.exception(
-            "Unable to click Replace: %s",
-            exc
-        )
-
-        return False, (
-            "Unable to click Replace. "
-            "Please refresh and try again."
-        )
-
-    # -----------------------------------------------------
-    # 2. Wait for the confirmation modal
-    # -----------------------------------------------------
-    confirmation_selectors = [
-        ".ant-modal-confirm-btns button.ant-btn-primary",
-        ".ant-modal-confirm-btns button",
-        ".ant-modal-footer button.ant-btn-primary",
-        ".ant-modal-footer button",
-        ".ant-popconfirm-buttons button.ant-btn-primary",
-        ".ant-popconfirm-buttons button",
-    ]
-
-    deadline = time.monotonic() + 15
-
-    while time.monotonic() < deadline:
-
-        # Detect account errors while waiting
-        body_text = await safe_body_text(page)
-
-        if text_has_expired_cdk(body_text):
-            return False, EXPIRED_CDK_ERROR
-
-        if text_has_invalid_cdk(body_text):
-            return False, INCORRECT_ACCOUNT_ERROR
-
-        # Try stable modal CSS selectors first
-        for selector in confirmation_selectors:
+            ".ant-modal-confirm:visible, .ant-modal:visible"
+        ).last
+        await modal.wait_for(state="visible", timeout=10000)
+        clicked_ok = False
+        for label in ("OK", "Confirm", "Yes", "确定", "确认"):
             try:
-                buttons = page.locator(selector)
-                count = await buttons.count()
-
-                if count > 0:
-                    for index in reversed(range(count)):
-                        button = buttons.nth(index)
-
-                        try:
-                            if await button.is_visible():
-                                await button.click(
-                                    timeout=5000,
-                                    force=True
-                                )
-
-                                await page.wait_for_timeout(500)
-                                return True, None
-
-                        except Exception:
-                            continue
-
-            except Exception:
-                continue
-
-        # Try confirmation text alternatives
-        for button_text in [
-            "OK",
-            "Confirm",
-            "Yes",
-            "确定",
-            "确认",
-        ]:
-            try:
-                button = page.get_by_role(
+                button = modal.get_by_role(
                     "button",
-                    name=button_text,
-                    exact=True
+                    name=label,
+                    exact=True,
                 ).last
-
-                if await button.is_visible():
-                    await button.click(
-                        timeout=5000,
-                        force=True
-                    )
-
-                    await page.wait_for_timeout(500)
-                    return True, None
-
+                if await button.count() > 0 and await button.is_visible():
+                    await button.click(timeout=8000, force=True)
+                    clicked_ok = True
+                    break
             except Exception:
                 continue
-
+        if not clicked_ok:
+            buttons = modal.locator("button:visible")
+            if await buttons.count() > 0:
+                await buttons.last.click(timeout=8000, force=True)
+                clicked_ok = True
+        if not clicked_ok:
+            return False, "Unable to confirm the request. Please try again."
         await page.wait_for_timeout(300)
-
-    # -----------------------------------------------------
-    # 3. Save debugging information
-    # -----------------------------------------------------
-    try:
-        timestamp = int(time.time())
-
-        await page.screenshot(
-            path=f"/tmp/confirm_failed_{timestamp}.png",
-            full_page=True
-        )
-
-        app.logger.error(
-            "Confirmation failed. URL=%s Screenshot=%s",
-            page.url,
-            f"/tmp/confirm_failed_{timestamp}.png"
-        )
-
-    except Exception:
-        pass
-
-    return False, (
-        "Please request the code again and retry."
-    )
-
-async def get_current_code_state(page, digits):
-    """
-    Read the main Code field and main Collection Time.
-
-    This ignores the history table.
-    """
-    current_code = None
-    collection_time = None
-
-    # -----------------------------------------------------
-    # Read the main Code input.
-    # Account = input 0
-    # Password = input 1
-    # Code = input 2
-    # -----------------------------------------------------
-    try:
-        inputs = page.locator("input:visible")
-        input_count = await inputs.count()
-
-        if input_count >= 3:
-            value = (
-                await inputs.nth(2).input_value()
-            ).strip()
-
-            if re.fullmatch(rf"\d{{{digits}}}", value):
-                current_code = value
-
+        return True, None
     except Exception as exc:
-        app.logger.warning(
-            "Unable to read main Code input: %s",
-            exc
-        )
-
-    # -----------------------------------------------------
-    # Read the main Collection Time from the page text.
-    # re.search returns the first Collection Time, which is
-    # the main one above the history table.
-    # -----------------------------------------------------
-    try:
-        body_text = await safe_body_text(page)
-
-        normalized_text = " ".join(
-            body_text
-            .replace("\xa0", " ")
-            .replace("\n", " ")
-            .split()
-        )
-
-        match = re.search(
-            r"Collection\s*Time\s*:?\s*"
-            r"(\d{4}-\d{2}-\d{2}\s+"
-            r"\d{2}:\d{2}:\d{2})",
-            normalized_text,
-            re.I,
-        )
-
-        if match:
-            collection_time = match.group(1)
-
-    except Exception as exc:
-        app.logger.warning(
-            "Unable to read Collection Time: %s",
-            exc
-        )
-
-    app.logger.info(
-        "CODE STATE: code=%r collection_time=%r",
-        current_code,
-        collection_time,
-    )
-
-    return current_code, collection_time
+        app.logger.exception("Unable to confirm Hint modal: %s", exc)
+        return False, "Unable to confirm the request. Please try again."
 
 
-def collection_time_is_recent(
-    collection_time,
-    max_age_minutes=15,
-):
-    """
-    The external website displays Collection Time in GMT+8.
-    """
-    if not collection_time:
-        return False
-
-    try:
-        gmt8 = timezone(timedelta(hours=8))
-
-        collected_at = datetime.strptime(
-            collection_time.strip(),
-            "%Y-%m-%d %H:%M:%S",
-        ).replace(tzinfo=gmt8)
-
-        current_time = datetime.now(gmt8)
-
-        age_seconds = (
-            current_time - collected_at
-        ).total_seconds()
-
-        app.logger.info(
-            "CODE AGE: now=%s collected=%s age=%s",
-            current_time.strftime("%Y-%m-%d %H:%M:%S"),
-            collected_at.strftime("%Y-%m-%d %H:%M:%S"),
-            age_seconds,
-        )
-
-        # Allow a small clock difference.
-        if age_seconds < -120:
-            return False
-
-        return age_seconds <= max_age_minutes * 60
-
-    except Exception as exc:
-        app.logger.exception(
-            "Collection Time parsing failed: %s",
-            exc
-        )
-        return False
-
-async def wait_for_code_or_error(
-    page,
-    digits,
-    ignored_values=None,
-    timeout_seconds=30,
-):
-    """
-    After Replace -> OK:
-
-    1. Keep checking the current Code and Collection Time.
-    2. Return the current code when its Collection Time is
-       within 15 minutes GMT+8.
-    3. Stop after the external page reports no more codes,
-       but allow the fields time to finish updating.
-    """
-    ignored_values = {
-        str(value).strip()
-        for value in (ignored_values or set())
-        if value is not None
-    }
-
+async def wait_for_replace_result(page, timeout_seconds=30):
     deadline = time.monotonic() + timeout_seconds
-    no_more_detected_at = None
-
-    no_code_messages = (
-        "we have not received the latest verification code",
-        "not received the latest verification code",
-        "no more verification code",
-        "no more verification codes",
-        "未收到最新验证码",
-        "没有更多验证码",
-    )
-
     while time.monotonic() < deadline:
         body_text = await safe_body_text(page)
-        body_lower = " ".join(
-            body_text.lower().split()
-        )
-
-        if text_has_expired_cdk(body_text):
-            return "expired", None
-
-        if text_has_invalid_cdk(body_text):
-            return "invalid", None
-
-        no_more_code = any(
-            message in body_lower
-            for message in no_code_messages
-        )
-
-        if no_more_code and no_more_detected_at is None:
-            no_more_detected_at = time.monotonic()
-
-        current_code, collection_time = (
-            await get_current_code_state(
-                page,
-                digits,
-            )
-        )
-
+        normalized = " ".join(body_text.lower().split())
+        if "cdk does not exist" in normalized or "cdk not exist" in normalized:
+            return "expired"
         if (
-            current_code
-            and current_code not in ignored_values
-            and collection_time_is_recent(
-                collection_time,
-                max_age_minutes=15,
-            )
+            "successfully obtained verification code" in normalized
+            or "verification code obtained successfully" in normalized
+            or "成功获取验证码" in normalized
+            or "验证码获取成功" in normalized
         ):
-            return "code", current_code
-
-        # Once "no more code" appears, allow another 5 seconds
-        # for Code and Collection Time to finish updating.
+            return "success"
         if (
-            no_more_detected_at is not None
-            and time.monotonic() - no_more_detected_at >= 5
+            "we have not received the latest verification code" in normalized
+            or "not received the latest verification code" in normalized
+            or "未收到最新验证码" in normalized
+            or "没有收到最新验证码" in normalized
         ):
-            return "no_code", None
+            return "no_more"
+        await page.wait_for_timeout(250)
+    return "timeout"
 
-        await page.wait_for_timeout(300)
 
-    # One final read before returning timeout.
-    current_code, collection_time = (
-        await get_current_code_state(
-            page,
-            digits,
-        )
-    )
+async def retrieve_all_latest_codes(page, max_clicks=10):
+    for _ in range(max_clicks):
+        clicked, click_error = await click_replace_and_hint_ok(page)
+        if not clicked:
+            return False, click_error
+        result = await wait_for_replace_result(page, timeout_seconds=30)
+        if result == "expired":
+            return False, EXPIRED_CDK_ERROR
+        if result == "no_more":
+            return True, None
+        if result == "success":
+            await page.wait_for_timeout(500)
+            continue
+        return False, "Please request the code again and retry."
+    return False, "Too many codes were received. Please try again."
 
-    if (
-        current_code
-        and current_code not in ignored_values
-        and collection_time_is_recent(
-            collection_time,
-            max_age_minutes=15,
-        )
-    ):
-        return "code", current_code
 
-    return "timeout", None
+def parse_history_time(time_text):
+    try:
+        return datetime.strptime(
+            (time_text or "").strip(),
+            "%Y-%m-%d %H:%M:%S",
+        ).replace(tzinfo=GMT8)
+    except (TypeError, ValueError):
+        return None
+
+
+async def get_latest_code_from_history(page, digits, max_age_minutes=15):
+    now_gmt8 = datetime.now(GMT8)
+    max_age_seconds = max_age_minutes * 60
+    try:
+        rows = page.locator("table tbody tr")
+        row_count = await rows.count()
+        app.logger.info("History row count: %s", row_count)
+        for index in range(row_count):
+            row = rows.nth(index)
+            cells = row.locator("td")
+            if await cells.count() < 2:
+                continue
+            code_text = (await cells.nth(0).inner_text()).strip()
+            time_text = (await cells.nth(1).inner_text()).strip()
+            collected_at = parse_history_time(time_text)
+            if not collected_at:
+                continue
+            age_seconds = (now_gmt8 - collected_at).total_seconds()
+            app.logger.info(
+                "History row %s: code=%r time=%r age=%s",
+                index, code_text, time_text, age_seconds
+            )
+            if age_seconds < -120:
+                continue
+            if age_seconds > max_age_seconds:
+                break
+            if re.fullmatch(rf"\d{{{digits}}}", code_text):
+                return code_text, time_text
+        return None, None
+    except Exception as exc:
+        app.logger.exception("Unable to read code history: %s", exc)
+        return None, None
+
 # =========================================================
 # 4-DIGIT SIGN-IN CODE
 # =========================================================
@@ -992,11 +713,8 @@ async def _get_auto_sign_in_code_async(
         account_email,
         account_password,
     )
-
     if password_error:
         return None, password_error
-
-    query_text = f"{account_email}----{real_password}"
 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(
@@ -1007,80 +725,44 @@ async def _get_auto_sign_in_code_async(
                 "--disable-blink-features=AutomationControlled",
             ],
         )
-
         try:
             context = await browser.new_context(
                 viewport={"width": 1400, "height": 900},
                 locale="en-US",
             )
-
             page = await context.new_page()
             page.set_default_timeout(30000)
 
-            cdk_value = quote(query_text, safe="")
-            auto_url = (
-                "https://yzmen.4knaifei.cn//#/?cdk="
-                f"{cdk_value}"
+            opened, open_error = await open_cdk_account(
+                page, account_email, real_password
             )
+            if not opened:
+                return None, open_error
 
-            await page.goto(
-                auto_url,
-                wait_until="domcontentloaded",
-                timeout=45000,
+            completed, retrieve_error = await retrieve_all_latest_codes(
+                page, max_clicks=10
             )
+            if not completed:
+                return None, retrieve_error
 
-            ready, ready_error = await wait_until_account_page_ready(page)
-
-            if not ready:
-                return None, ready_error
-
-            await close_initial_modal(page)
-
-            # Always click Replace first. Do not pre-scan or reject
-            # the code that is already displayed.
-            clicked, click_error = await click_replace_and_confirm(page)
-
-            if not clicked:
-                return None, click_error
-
-            result_type, result_value = await wait_for_code_or_error(
-                page,
-                digits=4,
-                timeout_seconds=30,
+            code, collection_time = await get_latest_code_from_history(
+                page, digits=4, max_age_minutes=15
             )
-
-            if result_type == "expired":
-                return None, EXPIRED_CDK_ERROR
-
-            if result_type == "invalid":
-                return None, INCORRECT_ACCOUNT_ERROR
-
-            if result_type == "code":
-                return result_value, None
-
-            if result_type == "no_code":
-                return (
-                    None,
-                    "No recent code was found. Please send a new "
-                    "sign-in code and try again.",
+            if code:
+                app.logger.info(
+                    "Returning 4-digit history code %s from %s",
+                    code, collection_time
                 )
-
-            if result_type == "stale":
-                return (
-                    None,
-                    "The latest code is more than 15 minutes old. "
-                    "Please request a new sign-in code.",
-                )
+                return code, None
 
             return (
                 None,
-                "No 4-digit code found. Please send the sign-in "
-                "code first and try again.",
+                "No recent 4-digit sign-in code was found. "
+                "Please request a new sign-in code and try again.",
             )
-
         except Exception as exc:
-            return None, f"System error: {str(exc)}"
-
+            app.logger.exception("Sign-in code system error: %s", exc)
+            return None, "System is busy or timed out. Please try again."
         finally:
             await browser.close()
 
@@ -1224,16 +906,8 @@ async def _get_verification_code_async(
         account_email,
         account_password,
     )
-
     if password_error:
         return None, password_error
-
-    query_text = f"{account_email}----{real_password}"
-
-    ignored_values = {
-        real_password.strip(),
-        account_password.strip(),
-    }
 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(
@@ -1244,89 +918,44 @@ async def _get_verification_code_async(
                 "--disable-blink-features=AutomationControlled",
             ],
         )
-
         try:
             context = await browser.new_context(
                 viewport={"width": 1400, "height": 900},
                 locale="en-US",
             )
-
             page = await context.new_page()
             page.set_default_timeout(30000)
 
-            cdk_value = quote(query_text, safe="")
-            auto_url = (
-                "https://yzmen.4knaifei.cn//#/?cdk="
-                f"{cdk_value}"
+            opened, open_error = await open_cdk_account(
+                page, account_email, real_password
             )
+            if not opened:
+                return None, open_error
 
-            await page.goto(
-                auto_url,
-                wait_until="domcontentloaded",
-                timeout=45000,
+            completed, retrieve_error = await retrieve_all_latest_codes(
+                page, max_clicks=10
             )
+            if not completed:
+                return None, retrieve_error
 
-            ready, ready_error = await wait_until_account_page_ready(page)
-
-            if not ready:
-                return None, ready_error
-
-            await close_initial_modal(page)
-
-            max_attempts = 5
-
-            for attempt in range(max_attempts):
-                # Always click Replace first. Do not pre-scan or reject
-                # the code that is already displayed.
-                clicked, click_error = await click_replace_and_confirm(page)
-
-                if not clicked:
-                    return None, click_error
-
-                result_type, result_value = await wait_for_code_or_error(
-                    page,
-                    digits=6,
-                    ignored_values=ignored_values,
-                    timeout_seconds=20,
+            code, collection_time = await get_latest_code_from_history(
+                page, digits=6, max_age_minutes=15
+            )
+            if code:
+                app.logger.info(
+                    "Returning 6-digit history code %s from %s",
+                    code, collection_time
                 )
-
-                if result_type == "expired":
-                    return None, EXPIRED_CDK_ERROR
-
-                if result_type == "invalid":
-                    return None, INCORRECT_ACCOUNT_ERROR
-
-                if result_type == "code":
-                    return result_value, None
-
-                if result_type == "no_code":
-                    # Stop clicking Replace once the external page says
-                    # there are no more verification codes.
-                    return (
-                        None,
-                        "No recent 6-digit verification code was found. "
-                        "Please request a new verification code and try again.",
-                    )
-
-                if result_type == "stale":
-                    return (
-                        None,
-                        "The latest 6-digit code is more than 15 minutes old. "
-                        "Please request a new verification code.",
-                    )
-
-                if attempt < max_attempts - 1:
-                    await page.wait_for_timeout(800)
+                return code, None
 
             return (
                 None,
-                "No 6-digit verification code found after "
-                "multiple attempts.",
+                "No recent 6-digit verification code was found. "
+                "Please request a new verification code and try again.",
             )
-
         except Exception as exc:
-            return None, f"System error: {str(exc)}"
-
+            app.logger.exception("Verification code system error: %s", exc)
+            return None, "System is busy or timed out. Please try again."
         finally:
             await browser.close()
 
