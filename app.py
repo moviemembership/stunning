@@ -751,11 +751,16 @@ async def click_replace_and_confirm(page):
         "Please request the code again and retry."
     )
 
-async def get_current_code(page, digits):
+async def get_current_code_state(page, digits):
     """
-    Read only the current Code input.
-    Do not scan the history table.
+    Read only the current Code input and its Collection Time.
+
+    The external page displays Collection Time in GMT+8.
+    The history table is not used for choosing the code.
     """
+    current_code = None
+    collection_time = None
+
     try:
         code_label = page.get_by_text(
             re.compile(r"^\s*Code\s*:\s*$", re.I)
@@ -771,52 +776,124 @@ async def get_current_code(page, digits):
             ).strip()
 
             if re.fullmatch(rf"\d{{{digits}}}", value):
-                return value
+                current_code = value
 
     except Exception:
         pass
 
-    # Fallback: Account, Password, Code are the first 3 inputs
+    if not current_code:
+        try:
+            inputs = page.locator("input:visible")
+
+            if await inputs.count() >= 3:
+                value = (
+                    await inputs.nth(2).input_value()
+                ).strip()
+
+                if re.fullmatch(rf"\d{{{digits}}}", value):
+                    current_code = value
+
+        except Exception:
+            pass
+
     try:
-        inputs = page.locator("input:visible")
+        body_text = await safe_body_text(page)
 
-        if await inputs.count() >= 3:
-            value = (
-                await inputs.nth(2).input_value()
-            ).strip()
+        match = re.search(
+            r"Collection\s*Time\s*:\s*"
+            r"(\d{4}-\d{2}-\d{2}\s+"
+            r"\d{2}:\d{2}:\d{2})",
+            body_text,
+            re.I,
+        )
 
-            if re.fullmatch(rf"\d{{{digits}}}", value):
-                return value
+        if match:
+            collection_time = match.group(1).strip()
 
     except Exception:
         pass
 
-    return None
+    return current_code, collection_time
+
+
+def collection_time_is_recent(
+    collection_time,
+    max_age_minutes=15,
+):
+    """
+    Treat the page's Collection Time as GMT+8 and return True only
+    when it is not older than max_age_minutes.
+    """
+    if not collection_time:
+        return False
+
+    try:
+        collected = datetime.strptime(
+            collection_time,
+            "%Y-%m-%d %H:%M:%S",
+        ).replace(
+            tzinfo=timezone(timedelta(hours=8))
+        )
+
+        now_gmt8 = datetime.now(
+            timezone(timedelta(hours=8))
+        )
+
+        age = now_gmt8 - collected
+
+        if age < timedelta(minutes=-2):
+            return False
+
+        return age <= timedelta(
+            minutes=max_age_minutes
+        )
+
+    except (TypeError, ValueError):
+        return False
 
 async def wait_for_code_or_error(
     page,
     digits,
     ignored_values=None,
-    previous_codes=None,
     timeout_seconds=30,
 ):
+    """
+    After Replace has been clicked, wait for the external page to finish.
+
+    We do not reject a code before clicking Replace.
+
+    When the page reports that there are no more verification codes,
+    stop and inspect the current code and Collection Time. Return the
+    latest code only when its Collection Time is within 15 minutes
+    in GMT+8.
+    """
     ignored_values = {
         str(value).strip()
         for value in (ignored_values or set())
         if value is not None
     }
 
-    previous_codes = {
-        str(value).strip()
-        for value in (previous_codes or set())
-        if value is not None
-    }
-
     deadline = time.monotonic() + timeout_seconds
+
+    no_code_messages = (
+        "we have not received the latest verification code",
+        "not received the latest verification code",
+        "no more verification code",
+        "no more verification codes",
+        "未收到最新验证码",
+        "没有更多验证码",
+    )
+
+    success_messages = (
+        "successfully obtained verification code",
+        "verification code obtained successfully",
+        "验证码获取成功",
+        "成功获取验证码",
+    )
 
     while time.monotonic() < deadline:
         body_text = await safe_body_text(page)
-        body_lower = body_text.lower()
+        body_lower = " ".join(body_text.lower().split())
 
         if text_has_expired_cdk(body_text):
             return "expired", None
@@ -824,27 +901,57 @@ async def wait_for_code_or_error(
         if text_has_invalid_cdk(body_text):
             return "invalid", None
 
-        if (
-            "we have not received the latest verification code"
-            in body_lower
-            or "not received the latest verification code"
-            in body_lower
-        ):
-            return "no_code", None
-
-        current_code = await get_current_code(
-            page,
-            digits
+        no_more_code = any(
+            message in body_lower
+            for message in no_code_messages
         )
 
-        if (
-            current_code
-            and current_code not in ignored_values
-            and current_code not in previous_codes
-        ):
-            return "code", current_code
+        success = any(
+            message in body_lower
+            for message in success_messages
+        )
+
+        if no_more_code or success:
+            current_code, collection_time = (
+                await get_current_code_state(
+                    page,
+                    digits,
+                )
+            )
+
+            if (
+                current_code
+                and current_code not in ignored_values
+                and collection_time_is_recent(
+                    collection_time,
+                    max_age_minutes=15,
+                )
+            ):
+                return "code", current_code
+
+            if no_more_code:
+                return "no_code", None
+
+            return "stale", None
 
         await page.wait_for_timeout(300)
+
+    current_code, collection_time = (
+        await get_current_code_state(
+            page,
+            digits,
+        )
+    )
+
+    if (
+        current_code
+        and current_code not in ignored_values
+        and collection_time_is_recent(
+            collection_time,
+            max_age_minutes=15,
+        )
+    ):
+        return "code", current_code
 
     return "timeout", None
 
@@ -917,12 +1024,8 @@ async def _get_auto_sign_in_code_async(
 
             await close_initial_modal(page)
 
-            previous_code = await get_current_code(page, 4)
-
-            previous_codes = {
-                previous_code
-            } if previous_code else set()
-
+            # Always click Replace first. Do not pre-scan or reject
+            # the code that is already displayed.
             clicked, click_error = await click_replace_and_confirm(page)
 
             if not clicked:
@@ -931,7 +1034,6 @@ async def _get_auto_sign_in_code_async(
             result_type, result_value = await wait_for_code_or_error(
                 page,
                 digits=4,
-                previous_codes=previous_codes,
                 timeout_seconds=30,
             )
 
@@ -947,8 +1049,15 @@ async def _get_auto_sign_in_code_async(
             if result_type == "no_code":
                 return (
                     None,
-                    "No new code received. Please send the "
-                    "sign-in code first.",
+                    "No recent code was found. Please send a new "
+                    "sign-in code and try again.",
+                )
+
+            if result_type == "stale":
+                return (
+                    None,
+                    "The latest code is more than 15 minutes old. "
+                    "Please request a new sign-in code.",
                 )
 
             return (
@@ -1155,12 +1264,8 @@ async def _get_verification_code_async(
             max_attempts = 5
 
             for attempt in range(max_attempts):
-                previous_code = await get_current_code(page, 6)
-
-                previous_codes = {
-                    previous_code
-                } if previous_code else set()
-
+                # Always click Replace first. Do not pre-scan or reject
+                # the code that is already displayed.
                 clicked, click_error = await click_replace_and_confirm(page)
 
                 if not clicked:
@@ -1170,7 +1275,6 @@ async def _get_verification_code_async(
                     page,
                     digits=6,
                     ignored_values=ignored_values,
-                    previous_codes=previous_codes,
                     timeout_seconds=20,
                 )
 
@@ -1184,11 +1288,19 @@ async def _get_verification_code_async(
                     return result_value, None
 
                 if result_type == "no_code":
+                    # Stop clicking Replace once the external page says
+                    # there are no more verification codes.
                     return (
                         None,
-                        "No 6-digit verification code found. "
-                        "Please request a new verification code "
-                        "and try again.",
+                        "No recent 6-digit verification code was found. "
+                        "Please request a new verification code and try again.",
+                    )
+
+                if result_type == "stale":
+                    return (
+                        None,
+                        "The latest 6-digit code is more than 15 minutes old. "
+                        "Please request a new verification code.",
                     )
 
                 if attempt < max_attempts - 1:
