@@ -513,7 +513,14 @@ async def wait_until_account_page_ready(page, timeout_seconds=20):
         if text_has_expired_cdk(body_text):
             return False, EXPIRED_CDK_ERROR
         if "click replace" in body_lower:
-            return True, None
+            try:
+                replace_button = page.locator(
+                    'button:visible:has-text("Click Replace")'
+                )
+                if await replace_button.count() > 0:
+                    return True, None
+            except Exception:
+                pass
         await page.wait_for_timeout(250)
     return False, "Unable to verify account. Please try again."
 
@@ -559,49 +566,157 @@ async def open_cdk_account(page, account_email, account_password):
 
 
 async def click_replace_and_hint_ok(page):
-    try:
-        replace_button = page.get_by_role(
-            "button",
-            name="Click Replace",
-            exact=True,
-        )
-        await replace_button.wait_for(state="visible", timeout=15000)
-        await replace_button.click(timeout=15000, force=True)
-    except Exception as exc:
-        app.logger.exception("Unable to click Replace: %s", exc)
+    """
+    Click the visible Click Replace button, then click OK
+    in the Hint modal.
+    """
+    replace_clicked = False
+    deadline = time.monotonic() + 20
+
+    while time.monotonic() < deadline:
+        body_text = await safe_body_text(page)
+
+        if text_has_expired_cdk(body_text):
+            return False, EXPIRED_CDK_ERROR
+
+        try:
+            candidates = page.locator(
+                'button:visible:has-text("Click Replace"), '
+                '.ant-modal:visible button:has-text("Click Replace"), '
+                '.ant-modal-content:visible button:has-text("Click Replace")'
+            )
+
+            count = await candidates.count()
+
+            for index in range(count):
+                button = candidates.nth(index)
+
+                if await button.is_visible():
+                    await button.scroll_into_view_if_needed()
+                    await button.click(timeout=5000, force=True)
+                    replace_clicked = True
+                    break
+
+        except Exception:
+            pass
+
+        if replace_clicked:
+            break
+
+        await page.wait_for_timeout(300)
+
+    if not replace_clicked:
         return False, "Unable to click Replace. Please try again."
 
-    try:
-        modal = page.locator(
-            ".ant-modal-confirm:visible, .ant-modal:visible"
-        ).last
-        await modal.wait_for(state="visible", timeout=10000)
-        clicked_ok = False
-        for label in ("OK", "Confirm", "Yes", "确定", "确认"):
-            try:
-                button = modal.get_by_role(
-                    "button",
-                    name=label,
-                    exact=True,
-                ).last
-                if await button.count() > 0 and await button.is_visible():
-                    await button.click(timeout=8000, force=True)
-                    clicked_ok = True
+    await page.wait_for_timeout(400)
+
+    ok_clicked = False
+    deadline = time.monotonic() + 15
+
+    while time.monotonic() < deadline:
+        try:
+            modals = page.locator(
+                ".ant-modal-confirm:visible, "
+                ".ant-modal:visible, "
+                ".ant-modal-content:visible"
+            )
+
+            modal_count = await modals.count()
+
+            for modal_index in reversed(range(modal_count)):
+                modal = modals.nth(modal_index)
+
+                if not await modal.is_visible():
+                    continue
+
+                modal_text = (await modal.inner_text()).lower()
+
+                if (
+                    "hint" not in modal_text
+                    and "please click" not in modal_text
+                    and "提示" not in modal_text
+                ):
+                    continue
+
+                for label in ("OK", "Confirm", "Yes", "确定", "确认"):
+                    try:
+                        button = modal.get_by_role(
+                            "button",
+                            name=label,
+                            exact=True,
+                        ).last
+
+                        if (
+                            await button.count() > 0
+                            and await button.is_visible()
+                        ):
+                            await button.click(timeout=5000, force=True)
+                            ok_clicked = True
+                            break
+                    except Exception:
+                        continue
+
+                if not ok_clicked:
+                    try:
+                        primary_button = modal.locator(
+                            "button.ant-btn-primary:visible"
+                        ).last
+
+                        if (
+                            await primary_button.count() > 0
+                            and await primary_button.is_visible()
+                        ):
+                            await primary_button.click(
+                                timeout=5000,
+                                force=True,
+                            )
+                            ok_clicked = True
+                    except Exception:
+                        pass
+
+                if ok_clicked:
                     break
-            except Exception:
-                continue
-        if not clicked_ok:
-            buttons = modal.locator("button:visible")
-            if await buttons.count() > 0:
-                await buttons.last.click(timeout=8000, force=True)
-                clicked_ok = True
-        if not clicked_ok:
-            return False, "Unable to confirm the request. Please try again."
+
+        except Exception:
+            pass
+
+        if ok_clicked:
+            await page.wait_for_timeout(300)
+            return True, None
+
         await page.wait_for_timeout(300)
-        return True, None
+
+    return False, "Unable to confirm the request. Please try again."
+
+
+async def get_top_history_signature(page):
+    """
+    Return the newest History row as:
+        (code, collection_time)
+    """
+    try:
+        rows = page.locator("table tbody tr")
+
+        if await rows.count() == 0:
+            return None, None
+
+        first_row = rows.first
+        cells = first_row.locator("td")
+
+        if await cells.count() < 2:
+            return None, None
+
+        code_text = (await cells.nth(0).inner_text()).strip()
+        time_text = (await cells.nth(1).inner_text()).strip()
+
+        return code_text, time_text
+
     except Exception as exc:
-        app.logger.exception("Unable to confirm Hint modal: %s", exc)
-        return False, "Unable to confirm the request. Please try again."
+        app.logger.warning(
+            "Unable to read top History row: %s",
+            exc,
+        )
+        return None, None
 
 
 async def wait_for_replace_result(
@@ -713,24 +828,78 @@ async def wait_for_replace_result(
 
         await page.wait_for_timeout(100)
 
+    try:
+        timestamp = int(time.time())
+        screenshot_path = (
+            f"/tmp/replace_result_timeout_{timestamp}.png"
+        )
+
+        await page.screenshot(
+            path=screenshot_path,
+            full_page=True,
+        )
+
+        app.logger.error(
+            "Replace result timeout. Previous history=%r "
+            "Current history=%r URL=%s Screenshot=%s",
+            previous_history,
+            await get_top_history_signature(page),
+            page.url,
+            screenshot_path,
+        )
+    except Exception:
+        pass
+
     return "timeout"
 
-async def retrieve_all_latest_codes(page, max_clicks=10):
-    for _ in range(max_clicks):
+async def retrieve_all_latest_codes(
+    page,
+    max_clicks=10,
+):
+    """
+    Keep clicking Replace until no newer verification code remains.
+    """
+    for attempt in range(max_clicks):
+        previous_history = await get_top_history_signature(page)
+
+        app.logger.info(
+            "Replace attempt %s, previous history=%r",
+            attempt + 1,
+            previous_history,
+        )
+
         clicked, click_error = await click_replace_and_hint_ok(page)
+
         if not clicked:
             return False, click_error
-        result = await wait_for_replace_result(page, timeout_seconds=30)
+
+        result = await wait_for_replace_result(
+            page,
+            previous_history=previous_history,
+            timeout_seconds=30,
+        )
+
+        app.logger.info(
+            "Replace attempt %s result=%s",
+            attempt + 1,
+            result,
+        )
+
         if result == "expired":
             return False, EXPIRED_CDK_ERROR
+
         if result == "invalid":
             return False, INCORRECT_ACCOUNT_ERROR
+
         if result == "no_more":
             return True, None
+
         if result == "success":
             await page.wait_for_timeout(500)
             continue
+
         return False, "Please request the code again and retry."
+
     return False, "Too many codes were received. Please try again."
 
 
