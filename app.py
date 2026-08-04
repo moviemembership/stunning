@@ -604,30 +604,114 @@ async def click_replace_and_hint_ok(page):
         return False, "Unable to confirm the request. Please try again."
 
 
-async def wait_for_replace_result(page, timeout_seconds=30):
+async def wait_for_replace_result(
+    page,
+    timeout_seconds=30,
+):
+    """
+    Wait for the result after Click Replace -> OK.
+
+    Returns:
+        success
+        no_more
+        expired
+        timeout
+    """
     deadline = time.monotonic() + timeout_seconds
+
     while time.monotonic() < deadline:
+        # Check Ant Design messages and notifications directly.
+        notification_selectors = [
+            ".ant-message-notice-content",
+            ".ant-notification-notice",
+            ".ant-message",
+            "[role='alert']",
+        ]
+
+        visible_texts = []
+
+        for selector in notification_selectors:
+            try:
+                elements = page.locator(selector)
+                count = await elements.count()
+
+                for index in range(count):
+                    element = elements.nth(index)
+
+                    if await element.is_visible():
+                        text = (
+                            await element.inner_text()
+                        ).strip()
+
+                        if text:
+                            visible_texts.append(text)
+
+            except Exception:
+                continue
+
+        # Also keep the full page text as a fallback.
         body_text = await safe_body_text(page)
-        normalized = " ".join(body_text.lower().split())
-        if "cdk does not exist" in normalized or "cdk not exist" in normalized:
-            return "expired"
+
+        combined_text = " ".join(
+            visible_texts + [body_text]
+        )
+
+        normalized = " ".join(
+            combined_text.lower().split()
+        )
+
+        app.logger.info(
+            "REPLACE RESULT TEXT: %s",
+            normalized[:1000],
+        )
+
         if (
-            "successfully obtained verification code" in normalized
-            or "verification code obtained successfully" in normalized
+            "cdk does not exist" in normalized
+            or "cdk not exist" in normalized
+        ):
+            return "expired"
+
+        if (
+            "successfully obtained verification code"
+            in normalized
+            or "verification code obtained successfully"
+            in normalized
             or "成功获取验证码" in normalized
             or "验证码获取成功" in normalized
         ):
             return "success"
+
         if (
-            "we have not received the latest verification code" in normalized
-            or "not received the latest verification code" in normalized
+            "we have not received the latest verification code"
+            in normalized
+            or "not received the latest verification code"
+            in normalized
             or "未收到最新验证码" in normalized
             or "没有收到最新验证码" in normalized
         ):
             return "no_more"
-        await page.wait_for_timeout(250)
-    return "timeout"
 
+        await page.wait_for_timeout(100)
+
+    # Save screenshot when no result notification was detected.
+    try:
+        timestamp = int(time.time())
+
+        await page.screenshot(
+            path=f"/tmp/replace_result_timeout_{timestamp}.png",
+            full_page=True,
+        )
+
+        app.logger.error(
+            "Replace result timed out. URL=%s screenshot=%s",
+            page.url,
+            f"/tmp/replace_result_timeout_{timestamp}.png",
+        )
+
+    except Exception:
+        pass
+
+    return "timeout"
 
 async def retrieve_all_latest_codes(page, max_clicks=10):
     for _ in range(max_clicks):
