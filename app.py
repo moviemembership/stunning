@@ -606,31 +606,39 @@ async def click_replace_and_hint_ok(page):
 
 async def wait_for_replace_result(
     page,
+    previous_history=None,
     timeout_seconds=30,
 ):
     """
-    Wait for the result after Click Replace -> OK.
+    Detect the result after Click Replace -> OK.
 
     Returns:
         success
         no_more
         expired
+        invalid
         timeout
     """
     deadline = time.monotonic() + timeout_seconds
 
+    previous_history = previous_history or (
+        None,
+        None,
+    )
+
     while time.monotonic() < deadline:
-        # Check Ant Design messages and notifications directly.
-        notification_selectors = [
+        notification_texts = []
+
+        selectors = [
             ".ant-message-notice-content",
+            ".ant-message-notice",
             ".ant-notification-notice",
-            ".ant-message",
+            ".ant-notification-notice-message",
+            ".ant-notification-notice-description",
             "[role='alert']",
         ]
 
-        visible_texts = []
-
-        for selector in notification_selectors:
+        for selector in selectors:
             try:
                 elements = page.locator(selector)
                 count = await elements.count()
@@ -638,49 +646,39 @@ async def wait_for_replace_result(
                 for index in range(count):
                     element = elements.nth(index)
 
-                    if await element.is_visible():
+                    try:
                         text = (
                             await element.inner_text()
                         ).strip()
 
                         if text:
-                            visible_texts.append(text)
+                            notification_texts.append(text)
+
+                    except Exception:
+                        continue
 
             except Exception:
                 continue
 
-        # Also keep the full page text as a fallback.
         body_text = await safe_body_text(page)
 
         combined_text = " ".join(
-            visible_texts + [body_text]
+            notification_texts + [body_text]
         )
 
         normalized = " ".join(
             combined_text.lower().split()
         )
 
-        app.logger.info(
-            "REPLACE RESULT TEXT: %s",
-            normalized[:1000],
-        )
-
-        if (
-            "cdk does not exist" in normalized
-            or "cdk not exist" in normalized
-        ):
+        # Expired account after Replace -> OK
+        if text_has_expired_cdk(combined_text):
             return "expired"
 
-        if (
-            "successfully obtained verification code"
-            in normalized
-            or "verification code obtained successfully"
-            in normalized
-            or "成功获取验证码" in normalized
-            or "验证码获取成功" in normalized
-        ):
-            return "success"
+        # Invalid login/CDK
+        if text_has_invalid_cdk(combined_text):
+            return "invalid"
 
+        # No more verification codes remain
         if (
             "we have not received the latest verification code"
             in normalized
@@ -691,25 +689,29 @@ async def wait_for_replace_result(
         ):
             return "no_more"
 
+        # Successful retrieval
+        if (
+            "successfully obtained verification code"
+            in normalized
+            or "verification code obtained successfully"
+            in normalized
+            or "成功获取验证码" in normalized
+            or "验证码获取成功" in normalized
+        ):
+            return "success"
+
+        # Fallback: newest history row changed
+        current_history = await get_top_history_signature(
+            page
+        )
+
+        if (
+            current_history != (None, None)
+            and current_history != previous_history
+        ):
+            return "success"
+
         await page.wait_for_timeout(100)
-
-    # Save screenshot when no result notification was detected.
-    try:
-        timestamp = int(time.time())
-
-        await page.screenshot(
-            path=f"/tmp/replace_result_timeout_{timestamp}.png",
-            full_page=True,
-        )
-
-        app.logger.error(
-            "Replace result timed out. URL=%s screenshot=%s",
-            page.url,
-            f"/tmp/replace_result_timeout_{timestamp}.png",
-        )
-
-    except Exception:
-        pass
 
     return "timeout"
 
@@ -721,6 +723,8 @@ async def retrieve_all_latest_codes(page, max_clicks=10):
         result = await wait_for_replace_result(page, timeout_seconds=30)
         if result == "expired":
             return False, EXPIRED_CDK_ERROR
+        if result == "invalid":
+            return False, INCORRECT_ACCOUNT_ERROR
         if result == "no_more":
             return True, None
         if result == "success":
