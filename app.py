@@ -567,10 +567,16 @@ async def open_cdk_account(page, account_email, account_password):
 
 async def click_replace_and_hint_ok(page):
     """
-    Click Replace, then click OK only inside the visible Hint popup.
+    Click Click Replace, then click OK in the Hint popup.
+
+    Do not wait for the Hint locator to become hidden because
+    the external website may keep or replace the modal element
+    while processing the request.
     """
 
-    # Click Replace
+    # =====================================================
+    # 1. CLICK REPLACE
+    # =====================================================
     try:
         replace_button = page.locator(
             'button:visible:has-text("Click Replace")'
@@ -591,14 +597,19 @@ async def click_replace_and_hint_ok(page):
             "Unable to click Replace: %s",
             exc,
         )
-        return False, "Unable to click Replace. Please try again."
 
-    # Find only the Hint confirmation modal
+        return False, (
+            "Unable to click Replace. Please try again."
+        )
+
+    # =====================================================
+    # 2. WAIT FOR THE HINT MODAL
+    # =====================================================
     try:
         hint_modal = page.locator(
             ".ant-modal-confirm:visible"
         ).filter(
-            has_text="Hint"
+            has_text=re.compile(r"Hint", re.I)
         ).first
 
         await hint_modal.wait_for(
@@ -606,6 +617,21 @@ async def click_replace_and_hint_ok(page):
             timeout=15000,
         )
 
+    except Exception as exc:
+        app.logger.exception(
+            "Hint popup did not appear: %s",
+            exc,
+        )
+
+        return False, (
+            "The confirmation window did not appear. "
+            "Please try again."
+        )
+
+    # =====================================================
+    # 3. CLICK THE OK BUTTON INSIDE THAT MODAL
+    # =====================================================
+    try:
         ok_button = hint_modal.get_by_role(
             "button",
             name="OK",
@@ -622,34 +648,123 @@ async def click_replace_and_hint_ok(page):
             force=True,
         )
 
-        # Confirm that the Hint popup actually closed
-        await hint_modal.wait_for(
-            state="hidden",
-            timeout=10000,
+        # Do not wait for hint_modal to become hidden.
+        # The next function will wait for the real result.
+        await page.wait_for_timeout(300)
+
+        app.logger.info(
+            "Hint OK button clicked successfully."
         )
 
         return True, None
 
     except Exception as exc:
         app.logger.exception(
-            "Unable to confirm Hint popup: %s",
+            "Unable to click Hint OK button: %s",
             exc,
         )
 
-        try:
-            timestamp = int(time.time())
+    # =====================================================
+    # 4. JAVASCRIPT FALLBACK
+    # =====================================================
+    try:
+        clicked = await page.evaluate("""
+            () => {
+                const modals = Array.from(
+                    document.querySelectorAll(
+                        '.ant-modal-confirm'
+                    )
+                );
 
-            await page.screenshot(
-                path=f"/tmp/hint_confirm_failed_{timestamp}.png",
-                full_page=True,
+                for (const modal of modals) {
+                    const modalText = (
+                        modal.innerText ||
+                        modal.textContent ||
+                        ''
+                    );
+
+                    const modalStyle =
+                        window.getComputedStyle(modal);
+
+                    const modalVisible =
+                        modalStyle.display !== 'none' &&
+                        modalStyle.visibility !== 'hidden' &&
+                        modal.offsetParent !== null;
+
+                    if (
+                        !modalVisible ||
+                        !modalText.toLowerCase().includes('hint')
+                    ) {
+                        continue;
+                    }
+
+                    const buttons = Array.from(
+                        modal.querySelectorAll('button')
+                    );
+
+                    const okButton = buttons.find(button => {
+                        const text = (
+                            button.innerText ||
+                            button.textContent ||
+                            ''
+                        ).trim();
+
+                        return text === 'OK';
+                    });
+
+                    if (okButton) {
+                        okButton.click();
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        """)
+
+        if clicked:
+            await page.wait_for_timeout(300)
+
+            app.logger.info(
+                "Hint OK clicked using JavaScript fallback."
             )
-        except Exception:
-            pass
 
-        return False, (
-            "Unable to confirm the request. Please try again."
+            return True, None
+
+    except Exception as exc:
+        app.logger.exception(
+            "JavaScript Hint OK click failed: %s",
+            exc,
         )
 
+    # =====================================================
+    # 5. SAVE FAILURE SCREENSHOT
+    # =====================================================
+    try:
+        timestamp = int(time.time())
+
+        screenshot_path = (
+            f"/tmp/hint_confirm_failed_{timestamp}.png"
+        )
+
+        await page.screenshot(
+            path=screenshot_path,
+            full_page=True,
+        )
+
+        app.logger.error(
+            "Unable to confirm Hint popup. "
+            "URL=%s Screenshot=%s",
+            page.url,
+            screenshot_path,
+        )
+
+    except Exception:
+        pass
+
+    return False, (
+        "Unable to confirm the request. Please try again."
+    )
 
 async def get_top_history_signature(page):
     """
