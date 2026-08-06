@@ -567,142 +567,88 @@ async def open_cdk_account(page, account_email, account_password):
 
 async def click_replace_and_hint_ok(page):
     """
-    Click the visible Click Replace button and then click
-    the visible OK/primary button in the confirmation modal.
+    Click Replace, then click OK only inside the visible Hint popup.
     """
 
-    # =====================================================
-    # 1. CLICK REPLACE
-    # =====================================================
-    replace_clicked = False
-    deadline = time.monotonic() + 20
-
-    while time.monotonic() < deadline:
-        body_text = await safe_body_text(page)
-
-        if text_has_expired_cdk(body_text):
-            return False, EXPIRED_CDK_ERROR
-
-        try:
-            replace_buttons = page.locator(
-                'button:visible:has-text("Click Replace")'
-            )
-
-            count = await replace_buttons.count()
-
-            for index in range(count):
-                button = replace_buttons.nth(index)
-
-                if await button.is_visible():
-                    await button.scroll_into_view_if_needed()
-
-                    await button.click(
-                        timeout=5000,
-                        force=True,
-                    )
-
-                    replace_clicked = True
-                    break
-
-        except Exception:
-            pass
-
-        if replace_clicked:
-            break
-
-        await page.wait_for_timeout(300)
-
-    if not replace_clicked:
-        return False, (
-            "Unable to click Replace. Please try again."
-        )
-
-    # Allow the confirmation modal to appear
-    await page.wait_for_timeout(500)
-
-    # =====================================================
-    # 2. CLICK CONFIRMATION OK
-    # =====================================================
-    deadline = time.monotonic() + 15
-
-    while time.monotonic() < deadline:
-        try:
-            # Check visible Ant Design confirmation buttons directly
-            selectors = [
-                ".ant-modal-confirm:visible "
-                ".ant-modal-confirm-btns "
-                "button.ant-btn-primary:visible",
-
-                ".ant-modal:visible "
-                ".ant-modal-footer "
-                "button.ant-btn-primary:visible",
-
-                ".ant-modal:visible "
-                "button:visible:has-text('OK')",
-
-                ".ant-modal-confirm:visible "
-                "button:visible:has-text('OK')",
-
-                ".ant-modal:visible "
-                "button:visible:has-text('Confirm')",
-
-                ".ant-modal:visible "
-                "button:visible:has-text('确定')",
-
-                ".ant-modal:visible "
-                "button:visible:has-text('确认')",
-            ]
-
-            for selector in selectors:
-                buttons = page.locator(selector)
-                count = await buttons.count()
-
-                for index in reversed(range(count)):
-                    button = buttons.nth(index)
-
-                    try:
-                        if await button.is_visible():
-                            await button.click(
-                                timeout=5000,
-                                force=True,
-                            )
-
-                            await page.wait_for_timeout(300)
-                            return True, None
-
-                    except Exception:
-                        continue
-
-        except Exception:
-            pass
-
-        await page.wait_for_timeout(250)
-
-    # Save screenshot for debugging
+    # Click Replace
     try:
-        timestamp = int(time.time())
+        replace_button = page.locator(
+            'button:visible:has-text("Click Replace")'
+        ).first
 
-        screenshot_path = (
-            f"/tmp/hint_confirm_failed_{timestamp}.png"
+        await replace_button.wait_for(
+            state="visible",
+            timeout=20000,
         )
 
-        await page.screenshot(
-            path=screenshot_path,
-            full_page=True,
+        await replace_button.click(
+            timeout=10000,
+            force=True,
         )
 
-        app.logger.error(
-            "Unable to confirm request. URL=%s Screenshot=%s",
-            page.url,
-            screenshot_path,
+    except Exception as exc:
+        app.logger.exception(
+            "Unable to click Replace: %s",
+            exc,
+        )
+        return False, "Unable to click Replace. Please try again."
+
+    # Find only the Hint confirmation modal
+    try:
+        hint_modal = page.locator(
+            ".ant-modal-confirm:visible"
+        ).filter(
+            has_text="Hint"
+        ).first
+
+        await hint_modal.wait_for(
+            state="visible",
+            timeout=15000,
         )
 
-    except Exception:
-        pass
+        ok_button = hint_modal.get_by_role(
+            "button",
+            name="OK",
+            exact=True,
+        )
 
-    return False, (
-        "Unable to confirm the request. Please try again."
-    )
+        await ok_button.wait_for(
+            state="visible",
+            timeout=10000,
+        )
+
+        await ok_button.click(
+            timeout=10000,
+            force=True,
+        )
+
+        # Confirm that the Hint popup actually closed
+        await hint_modal.wait_for(
+            state="hidden",
+            timeout=10000,
+        )
+
+        return True, None
+
+    except Exception as exc:
+        app.logger.exception(
+            "Unable to confirm Hint popup: %s",
+            exc,
+        )
+
+        try:
+            timestamp = int(time.time())
+
+            await page.screenshot(
+                path=f"/tmp/hint_confirm_failed_{timestamp}.png",
+                full_page=True,
+            )
+        except Exception:
+            pass
+
+        return False, (
+            "Unable to confirm the request. Please try again."
+        )
 
 
 async def get_top_history_signature(page):
