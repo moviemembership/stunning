@@ -567,16 +567,11 @@ async def open_cdk_account(page, account_email, account_password):
 
 async def click_replace_and_hint_ok(page):
     """
-    Click Click Replace, then click OK in the Hint popup.
-
-    Do not wait for the Hint locator to become hidden because
-    the external website may keep or replace the modal element
-    while processing the request.
+    Click Replace, then click the visible confirmation OK button.
+    Do not depend on the popup title being exactly 'Hint'.
     """
 
-    # =====================================================
-    # 1. CLICK REPLACE
-    # =====================================================
+    # 1. Click Replace
     try:
         replace_button = page.locator(
             'button:visible:has-text("Click Replace")'
@@ -602,71 +597,56 @@ async def click_replace_and_hint_ok(page):
             "Unable to click Replace. Please try again."
         )
 
-    # =====================================================
-    # 2. WAIT FOR THE HINT MODAL
-    # =====================================================
-    try:
-        hint_modal = page.locator(
-            ".ant-modal-confirm:visible"
-        ).filter(
-            has_text=re.compile(r"Hint", re.I)
-        ).first
+    # 2. Wait for a visible OK button inside a confirmation modal
+    deadline = time.monotonic() + 15
 
-        await hint_modal.wait_for(
-            state="visible",
-            timeout=15000,
-        )
+    while time.monotonic() < deadline:
+        try:
+            ok_buttons = page.locator(
+                ".ant-modal-confirm:visible "
+                "button:visible"
+            )
 
-    except Exception as exc:
-        app.logger.exception(
-            "Hint popup did not appear: %s",
-            exc,
-        )
+            count = await ok_buttons.count()
 
-        return False, (
-            "The confirmation window did not appear. "
-            "Please try again."
-        )
+            for index in reversed(range(count)):
+                button = ok_buttons.nth(index)
 
-    # =====================================================
-    # 3. CLICK THE OK BUTTON INSIDE THAT MODAL
-    # =====================================================
-    try:
-        ok_button = hint_modal.get_by_role(
-            "button",
-            name="OK",
-            exact=True,
-        )
+                try:
+                    text = (
+                        await button.inner_text()
+                    ).strip()
 
-        await ok_button.wait_for(
-            state="visible",
-            timeout=10000,
-        )
+                    if text in {
+                        "OK",
+                        "Confirm",
+                        "Yes",
+                        "确定",
+                        "确认",
+                    }:
+                        await button.click(
+                            timeout=5000,
+                            force=True,
+                        )
 
-        await ok_button.click(
-            timeout=10000,
-            force=True,
-        )
+                        await page.wait_for_timeout(300)
 
-        # Do not wait for hint_modal to become hidden.
-        # The next function will wait for the real result.
-        await page.wait_for_timeout(300)
+                        app.logger.info(
+                            "Confirmation button clicked: %s",
+                            text,
+                        )
 
-        app.logger.info(
-            "Hint OK button clicked successfully."
-        )
+                        return True, None
 
-        return True, None
+                except Exception:
+                    continue
 
-    except Exception as exc:
-        app.logger.exception(
-            "Unable to click Hint OK button: %s",
-            exc,
-        )
+        except Exception:
+            pass
 
-    # =====================================================
-    # 4. JAVASCRIPT FALLBACK
-    # =====================================================
+        await page.wait_for_timeout(200)
+
+    # 3. JavaScript fallback
     try:
         clicked = await page.evaluate("""
             () => {
@@ -677,24 +657,14 @@ async def click_replace_and_hint_ok(page):
                 );
 
                 for (const modal of modals) {
-                    const modalText = (
-                        modal.innerText ||
-                        modal.textContent ||
-                        ''
-                    );
+                    const style = window.getComputedStyle(modal);
 
-                    const modalStyle =
-                        window.getComputedStyle(modal);
-
-                    const modalVisible =
-                        modalStyle.display !== 'none' &&
-                        modalStyle.visibility !== 'hidden' &&
+                    const visible =
+                        style.display !== 'none' &&
+                        style.visibility !== 'hidden' &&
                         modal.offsetParent !== null;
 
-                    if (
-                        !modalVisible ||
-                        !modalText.toLowerCase().includes('hint')
-                    ) {
+                    if (!visible) {
                         continue;
                     }
 
@@ -702,19 +672,23 @@ async def click_replace_and_hint_ok(page):
                         modal.querySelectorAll('button')
                     );
 
-                    const okButton = buttons.find(button => {
+                    for (const button of buttons.reverse()) {
                         const text = (
                             button.innerText ||
                             button.textContent ||
                             ''
                         ).trim();
 
-                        return text === 'OK';
-                    });
-
-                    if (okButton) {
-                        okButton.click();
-                        return true;
+                        if (
+                            text === 'OK' ||
+                            text === 'Confirm' ||
+                            text === 'Yes' ||
+                            text === '确定' ||
+                            text === '确认'
+                        ) {
+                            button.click();
+                            return true;
+                        }
                     }
                 }
 
@@ -726,20 +700,18 @@ async def click_replace_and_hint_ok(page):
             await page.wait_for_timeout(300)
 
             app.logger.info(
-                "Hint OK clicked using JavaScript fallback."
+                "Confirmation clicked using JavaScript."
             )
 
             return True, None
 
     except Exception as exc:
         app.logger.exception(
-            "JavaScript Hint OK click failed: %s",
+            "JavaScript confirmation failed: %s",
             exc,
         )
 
-    # =====================================================
-    # 5. SAVE FAILURE SCREENSHOT
-    # =====================================================
+    # 4. Save screenshot
     try:
         timestamp = int(time.time())
 
@@ -753,7 +725,7 @@ async def click_replace_and_hint_ok(page):
         )
 
         app.logger.error(
-            "Unable to confirm Hint popup. "
+            "Confirmation button not found. "
             "URL=%s Screenshot=%s",
             page.url,
             screenshot_path,
