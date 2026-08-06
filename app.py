@@ -567,176 +567,200 @@ async def open_cdk_account(page, account_email, account_password):
 
 async def click_replace_and_hint_ok(page):
     """
-    Click Replace, then click the visible confirmation OK button.
-    Do not depend on the popup title being exactly 'Hint'.
+    Click Replace and verify that the Hint modal actually opens.
+    Then click its OK button.
     """
 
-    # 1. Click Replace
-    try:
-        replace_button = page.locator(
-            'button:visible:has-text("Click Replace")'
-        ).first
+    max_replace_attempts = 3
 
-        await replace_button.wait_for(
-            state="visible",
-            timeout=20000,
-        )
-
-        await replace_button.click(
-            timeout=10000,
-            force=True,
-        )
-
-    except Exception as exc:
-        app.logger.exception(
-            "Unable to click Replace: %s",
-            exc,
-        )
-
-        return False, (
-            "Unable to click Replace. Please try again."
-        )
-
-    # 2. Wait for a visible OK button inside a confirmation modal
-    deadline = time.monotonic() + 15
-
-    while time.monotonic() < deadline:
+    for attempt in range(1, max_replace_attempts + 1):
         try:
-            ok_buttons = page.locator(
-                ".ant-modal-confirm:visible "
-                "button:visible"
+            replace_buttons = page.locator(
+                'button:visible:has-text("Click Replace")'
             )
 
-            count = await ok_buttons.count()
+            count = await replace_buttons.count()
 
-            for index in reversed(range(count)):
-                button = ok_buttons.nth(index)
+            if count == 0:
+                return False, (
+                    "Unable to find the Replace button. "
+                    "Please try again."
+                )
 
-                try:
-                    text = (
-                        await button.inner_text()
-                    ).strip()
+            # Usually the visible account modal has the last matching button.
+            replace_button = replace_buttons.last
 
-                    if text in {
-                        "OK",
-                        "Confirm",
-                        "Yes",
-                        "确定",
-                        "确认",
-                    }:
-                        await button.click(
-                            timeout=5000,
-                            force=True,
-                        )
-
-                        await page.wait_for_timeout(300)
-
-                        app.logger.info(
-                            "Confirmation button clicked: %s",
-                            text,
-                        )
-
-                        return True, None
-
-                except Exception:
-                    continue
-
-        except Exception:
-            pass
-
-        await page.wait_for_timeout(200)
-
-    # 3. JavaScript fallback
-    try:
-        clicked = await page.evaluate("""
-            () => {
-                const modals = Array.from(
-                    document.querySelectorAll(
-                        '.ant-modal-confirm'
-                    )
-                );
-
-                for (const modal of modals) {
-                    const style = window.getComputedStyle(modal);
-
-                    const visible =
-                        style.display !== 'none' &&
-                        style.visibility !== 'hidden' &&
-                        modal.offsetParent !== null;
-
-                    if (!visible) {
-                        continue;
-                    }
-
-                    const buttons = Array.from(
-                        modal.querySelectorAll('button')
-                    );
-
-                    for (const button of buttons.reverse()) {
-                        const text = (
-                            button.innerText ||
-                            button.textContent ||
-                            ''
-                        ).trim();
-
-                        if (
-                            text === 'OK' ||
-                            text === 'Confirm' ||
-                            text === 'Yes' ||
-                            text === '确定' ||
-                            text === '确认'
-                        ) {
-                            button.click();
-                            return true;
-                        }
-                    }
-                }
-
-                return false;
-            }
-        """)
-
-        if clicked:
-            await page.wait_for_timeout(300)
+            await replace_button.scroll_into_view_if_needed()
 
             app.logger.info(
-                "Confirmation clicked using JavaScript."
+                "Clicking Replace, attempt %s",
+                attempt,
             )
+
+            # Normal click first
+            try:
+                await replace_button.click(
+                    timeout=5000
+                )
+            except Exception:
+                # Force click only as fallback
+                await replace_button.click(
+                    timeout=5000,
+                    force=True,
+                )
+
+        except Exception as exc:
+            app.logger.exception(
+                "Replace click attempt %s failed: %s",
+                attempt,
+                exc,
+            )
+
+            if attempt < max_replace_attempts:
+                await page.wait_for_timeout(600)
+                continue
+
+            return False, (
+                "Unable to click Replace. Please try again."
+            )
+
+        # -------------------------------------------------
+        # Confirm that the Hint modal really appeared
+        # -------------------------------------------------
+        hint_modal = page.locator(
+            ".ant-modal-confirm"
+        ).filter(
+            has_text=re.compile(
+                r"Hint|Please click to obtain",
+                re.I,
+            )
+        ).last
+
+        try:
+            await hint_modal.wait_for(
+                state="visible",
+                timeout=5000,
+            )
+
+            app.logger.info(
+                "Hint modal appeared after Replace attempt %s",
+                attempt,
+            )
+
+        except Exception:
+            app.logger.warning(
+                "Replace attempt %s did not open Hint modal.",
+                attempt,
+            )
+
+            if attempt < max_replace_attempts:
+                await page.wait_for_timeout(700)
+                continue
+
+            try:
+                timestamp = int(time.time())
+
+                screenshot_path = (
+                    f"/tmp/replace_no_hint_{timestamp}.png"
+                )
+
+                await page.screenshot(
+                    path=screenshot_path,
+                    full_page=True,
+                )
+
+                app.logger.error(
+                    "Replace was clicked but Hint did not appear. "
+                    "URL=%s Screenshot=%s",
+                    page.url,
+                    screenshot_path,
+                )
+
+            except Exception:
+                pass
+
+            return False, (
+                "The confirmation window did not appear. "
+                "Please try again."
+            )
+
+        # -------------------------------------------------
+        # Click OK inside the confirmed Hint modal
+        # -------------------------------------------------
+        try:
+            ok_button = hint_modal.locator(
+                "button"
+            ).filter(
+                has_text=re.compile(r"^OK$", re.I)
+            ).last
+
+            await ok_button.wait_for(
+                state="visible",
+                timeout=5000,
+            )
+
+            await ok_button.click(
+                timeout=5000,
+            )
+
+            app.logger.info(
+                "Hint OK clicked successfully."
+            )
+
+            # Do not wait for the modal to become hidden.
+            await page.wait_for_timeout(300)
 
             return True, None
 
-    except Exception as exc:
-        app.logger.exception(
-            "JavaScript confirmation failed: %s",
-            exc,
-        )
+        except Exception as exc:
+            app.logger.exception(
+                "Unable to click Hint OK: %s",
+                exc,
+            )
 
-    # 4. Save screenshot
-    try:
-        timestamp = int(time.time())
+            try:
+                # JavaScript fallback, limited to the Hint modal
+                clicked = await hint_modal.evaluate("""
+                    modal => {
+                        const buttons = Array.from(
+                            modal.querySelectorAll("button")
+                        );
 
-        screenshot_path = (
-            f"/tmp/hint_confirm_failed_{timestamp}.png"
-        )
+                        const okButton = buttons.find(button => {
+                            const text = (
+                                button.innerText ||
+                                button.textContent ||
+                                ""
+                            ).trim();
 
-        await page.screenshot(
-            path=screenshot_path,
-            full_page=True,
-        )
+                            return text === "OK";
+                        });
 
-        app.logger.error(
-            "Confirmation button not found. "
-            "URL=%s Screenshot=%s",
-            page.url,
-            screenshot_path,
-        )
+                        if (!okButton) {
+                            return false;
+                        }
 
-    except Exception:
-        pass
+                        okButton.click();
+                        return true;
+                    }
+                """)
 
-    return False, (
-        "Unable to confirm the request. Please try again."
-    )
+                if clicked:
+                    await page.wait_for_timeout(300)
+                    return True, None
+
+            except Exception as js_exc:
+                app.logger.exception(
+                    "JavaScript OK click failed: %s",
+                    js_exc,
+                )
+
+            return False, (
+                "Unable to confirm the request. "
+                "Please try again."
+            )
+
+    return False, "Unable to click Replace. Please try again."
 
 async def get_top_history_signature(page):
     """
