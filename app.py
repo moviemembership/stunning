@@ -567,9 +567,13 @@ async def open_cdk_account(page, account_email, account_password):
 
 async def click_replace_and_hint_ok(page):
     """
-    Click the visible Click Replace button, then click OK
-    in the Hint modal.
+    Click the visible Click Replace button and then click
+    the visible OK/primary button in the confirmation modal.
     """
+
+    # =====================================================
+    # 1. CLICK REPLACE
+    # =====================================================
     replace_clicked = False
     deadline = time.monotonic() + 20
 
@@ -580,20 +584,23 @@ async def click_replace_and_hint_ok(page):
             return False, EXPIRED_CDK_ERROR
 
         try:
-            candidates = page.locator(
-                'button:visible:has-text("Click Replace"), '
-                '.ant-modal:visible button:has-text("Click Replace"), '
-                '.ant-modal-content:visible button:has-text("Click Replace")'
+            replace_buttons = page.locator(
+                'button:visible:has-text("Click Replace")'
             )
 
-            count = await candidates.count()
+            count = await replace_buttons.count()
 
             for index in range(count):
-                button = candidates.nth(index)
+                button = replace_buttons.nth(index)
 
                 if await button.is_visible():
                     await button.scroll_into_view_if_needed()
-                    await button.click(timeout=5000, force=True)
+
+                    await button.click(
+                        timeout=5000,
+                        force=True,
+                    )
+
                     replace_clicked = True
                     break
 
@@ -606,87 +613,96 @@ async def click_replace_and_hint_ok(page):
         await page.wait_for_timeout(300)
 
     if not replace_clicked:
-        return False, "Unable to click Replace. Please try again."
+        return False, (
+            "Unable to click Replace. Please try again."
+        )
 
-    await page.wait_for_timeout(400)
+    # Allow the confirmation modal to appear
+    await page.wait_for_timeout(500)
 
-    ok_clicked = False
+    # =====================================================
+    # 2. CLICK CONFIRMATION OK
+    # =====================================================
     deadline = time.monotonic() + 15
 
     while time.monotonic() < deadline:
         try:
-            modals = page.locator(
-                ".ant-modal-confirm:visible, "
-                ".ant-modal:visible, "
-                ".ant-modal-content:visible"
-            )
+            # Check visible Ant Design confirmation buttons directly
+            selectors = [
+                ".ant-modal-confirm:visible "
+                ".ant-modal-confirm-btns "
+                "button.ant-btn-primary:visible",
 
-            modal_count = await modals.count()
+                ".ant-modal:visible "
+                ".ant-modal-footer "
+                "button.ant-btn-primary:visible",
 
-            for modal_index in reversed(range(modal_count)):
-                modal = modals.nth(modal_index)
+                ".ant-modal:visible "
+                "button:visible:has-text('OK')",
 
-                if not await modal.is_visible():
-                    continue
+                ".ant-modal-confirm:visible "
+                "button:visible:has-text('OK')",
 
-                modal_text = (await modal.inner_text()).lower()
+                ".ant-modal:visible "
+                "button:visible:has-text('Confirm')",
 
-                if (
-                    "hint" not in modal_text
-                    and "please click" not in modal_text
-                    and "提示" not in modal_text
-                ):
-                    continue
+                ".ant-modal:visible "
+                "button:visible:has-text('确定')",
 
-                for label in ("OK", "Confirm", "Yes", "确定", "确认"):
+                ".ant-modal:visible "
+                "button:visible:has-text('确认')",
+            ]
+
+            for selector in selectors:
+                buttons = page.locator(selector)
+                count = await buttons.count()
+
+                for index in reversed(range(count)):
+                    button = buttons.nth(index)
+
                     try:
-                        button = modal.get_by_role(
-                            "button",
-                            name=label,
-                            exact=True,
-                        ).last
-
-                        if (
-                            await button.count() > 0
-                            and await button.is_visible()
-                        ):
-                            await button.click(timeout=5000, force=True)
-                            ok_clicked = True
-                            break
-                    except Exception:
-                        continue
-
-                if not ok_clicked:
-                    try:
-                        primary_button = modal.locator(
-                            "button.ant-btn-primary:visible"
-                        ).last
-
-                        if (
-                            await primary_button.count() > 0
-                            and await primary_button.is_visible()
-                        ):
-                            await primary_button.click(
+                        if await button.is_visible():
+                            await button.click(
                                 timeout=5000,
                                 force=True,
                             )
-                            ok_clicked = True
-                    except Exception:
-                        pass
 
-                if ok_clicked:
-                    break
+                            await page.wait_for_timeout(300)
+                            return True, None
+
+                    except Exception:
+                        continue
 
         except Exception:
             pass
 
-        if ok_clicked:
-            await page.wait_for_timeout(300)
-            return True, None
+        await page.wait_for_timeout(250)
 
-        await page.wait_for_timeout(300)
+    # Save screenshot for debugging
+    try:
+        timestamp = int(time.time())
 
-    return False, "Unable to confirm the request. Please try again."
+        screenshot_path = (
+            f"/tmp/hint_confirm_failed_{timestamp}.png"
+        )
+
+        await page.screenshot(
+            path=screenshot_path,
+            full_page=True,
+        )
+
+        app.logger.error(
+            "Unable to confirm request. URL=%s Screenshot=%s",
+            page.url,
+            screenshot_path,
+        )
+
+    except Exception:
+        pass
+
+    return False, (
+        "Unable to confirm the request. Please try again."
+    )
 
 
 async def get_top_history_signature(page):
