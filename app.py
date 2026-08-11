@@ -1103,20 +1103,27 @@ def get_outlook_household_code(user_email):
 
 
 async def _get_outlook_household_code_async(user_email):
+    """
+    Outlook / Hotmail household-code retrieval.
+
+    The external site can load in English, Chinese, or Spanish.
+    """
+    user_email = (user_email or "").strip()
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
             args=[
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled"
-            ]
+                "--disable-blink-features=AutomationControlled",
+            ],
         )
 
         try:
             context = await browser.new_context(
                 viewport={"width": 1800, "height": 900},
-                locale="en-US"
+                locale="en-US",
             )
 
             page = await context.new_page()
@@ -1125,89 +1132,291 @@ async def _get_outlook_household_code_async(user_email):
             await page.goto(
                 OUTLOOK_URL,
                 wait_until="domcontentloaded",
-                timeout=60000
+                timeout=60000,
             )
 
-            # switch to English every time
+            email_input = page.locator("input:visible").first
+            await email_input.wait_for(
+                state="visible",
+                timeout=30000,
+            )
+            await email_input.fill(user_email)
+
+            query_clicked = False
+            query_names = (
+                "Query verification code",
+                "Get verification code",
+                "Query",
+                "Consulta",
+                "Consultar",
+                "查询验证码",
+                "查询",
+            )
+
+            for button_name in query_names:
+                try:
+                    button = page.get_by_role(
+                        "button",
+                        name=button_name,
+                        exact=True,
+                    ).first
+
+                    if (
+                        await button.count() > 0
+                        and await button.is_visible()
+                    ):
+                        await button.click(
+                            timeout=10000,
+                            force=True,
+                        )
+                        query_clicked = True
+                        break
+                except Exception:
+                    continue
+
+            if not query_clicked:
+                try:
+                    buttons = page.locator("button:visible")
+                    button_count = await buttons.count()
+                    for index in range(button_count):
+                        button = buttons.nth(index)
+                        try:
+                            button_text = (
+                                await button.inner_text()
+                            ).strip()
+                            if button_text:
+                                await button.click(
+                                    timeout=10000,
+                                    force=True,
+                                )
+                                query_clicked = True
+                                break
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
+
+            if not query_clicked:
+                return None, (
+                    "Unable to query the household code. "
+                    "Please try again."
+                )
+
+            deadline = time.monotonic() + 20
+            confirm_button = None
+
+            no_code_messages = (
+                "the email verification code data has not been obtained yet",
+                "verification code data has not been obtained",
+                "has not been obtained",
+                "尚未获取到邮箱验证码数据",
+                "未获取到邮箱验证码数据",
+                "no se han obtenido datos del código de verificación del correo electrónico",
+                "no se han obtenido datos del codigo de verificacion del correo electronico",
+                "no se han obtenido datos del código de verificación",
+                "no se han obtenido datos del codigo de verificacion",
+            )
+
+            expired_messages = (
+                "verification code has expired",
+                "code has expired",
+                "邮箱验证码已过期",
+                "验证码已过期",
+                "已过期",
+                "ha caducado",
+                "caducado",
+                "expirado",
+            )
+
+            confirm_texts = {
+                "OK", "Confirm", "Yes",
+                "确定", "確認", "确认",
+                "Aceptar", "Confirmar", "Sí", "Si",
+            }
+
+            while time.monotonic() < deadline:
+                body_text = await safe_body_text(page)
+                normalized = " ".join(
+                    (body_text or "").lower().split()
+                )
+
+                if any(message in normalized for message in no_code_messages):
+                    return None, (
+                        "No household code found. "
+                        "Please send the household code email first "
+                        "and try again."
+                    )
+
+                if any(message in normalized for message in expired_messages):
+                    return None, (
+                        "The household code has expired. "
+                        "Please send a new household code and try again."
+                    )
+
+                modal_selectors = (
+                    ".ant-modal-confirm:visible",
+                    ".ant-modal:visible",
+                    ".ant-modal-content:visible",
+                )
+
+                found_confirm = False
+
+                for modal_selector in modal_selectors:
+                    try:
+                        modals = page.locator(modal_selector)
+                        modal_count = await modals.count()
+                        for modal_index in reversed(range(modal_count)):
+                            modal = modals.nth(modal_index)
+                            if not await modal.is_visible():
+                                continue
+                            buttons = modal.locator("button:visible")
+                            button_count = await buttons.count()
+                            for button_index in reversed(range(button_count)):
+                                button = buttons.nth(button_index)
+                                try:
+                                    button_text = (
+                                        await button.inner_text()
+                                    ).strip()
+                                    if button_text in confirm_texts:
+                                        confirm_button = button
+                                        found_confirm = True
+                                        break
+                                except Exception:
+                                    continue
+                            if found_confirm:
+                                break
+                        if found_confirm:
+                            break
+                    except Exception:
+                        continue
+
+                if found_confirm:
+                    break
+
+                await page.wait_for_timeout(200)
+
+            if confirm_button is None:
+                try:
+                    timestamp = int(time.time())
+                    screenshot_path = (
+                        f"/tmp/household_result_not_found_{timestamp}.png"
+                    )
+                    await page.screenshot(
+                        path=screenshot_path,
+                        full_page=True,
+                    )
+                    app.logger.error(
+                        "Household result not detected. URL=%s Screenshot=%s",
+                        page.url,
+                        screenshot_path,
+                    )
+                except Exception:
+                    pass
+
+                return None, (
+                    "The household code service did not return a result. "
+                    "Please try again."
+                )
+
+            pages_before = list(context.pages)
+
             try:
-                await page.locator("text=简体中文").click(timeout=5000)
-                await page.get_by_text("English", exact=True).click(timeout=5000)
-                await page.wait_for_timeout(800)
+                await confirm_button.click(
+                    timeout=10000,
+                    force=True,
+                )
+            except Exception as exc:
+                app.logger.exception(
+                    "Household confirm click failed: %s",
+                    exc,
+                )
+                return None, (
+                    "Unable to confirm the household code request. "
+                    "Please try again."
+                )
+
+            await page.wait_for_timeout(1200)
+
+            current_pages = context.pages
+            if len(current_pages) > len(pages_before):
+                code_page = current_pages[-1]
+            else:
+                code_page = page
+
+            try:
+                await code_page.wait_for_load_state(
+                    "domcontentloaded",
+                    timeout=30000,
+                )
             except Exception:
                 pass
 
-            await page.locator("input").first.wait_for(state="visible", timeout=30000)
-            await page.locator("input").first.fill(user_email)
+            await code_page.wait_for_timeout(1200)
 
-            try:
-                await page.get_by_text("Query verification code", exact=True).click(timeout=10000)
-            except Exception:
-                await page.locator("button").first.click(timeout=10000)
-
-            await page.wait_for_timeout(1500)
-
-            body_text = await page.locator("body").inner_text()
-
-            if (
-                "The email verification code data has not been obtained yet" in body_text
-                or "尚未获取到邮箱验证码数据" in body_text
-                or "has not been obtained" in body_text
-            ):
-                return None, "No household code found. Please make sure you sent the household code email first."
-
-            if (
-                "邮箱验证码已过期" in body_text
-                or "expired" in body_text.lower()
-                or "已过期" in body_text
-            ):
-                return None, "Link was expired. Please resend the code and try again."
-
-            code_page = page
-            clicked = False
-
-            for txt in ["OK", "确定"]:
-                if clicked:
-                    break
-
-                try:
-                    async with context.expect_page(timeout=8000) as new_page_info:
-                        await page.get_by_text(txt, exact=True).click(timeout=3000)
-
-                    code_page = await new_page_info.value
-                    clicked = True
-
-                except Exception:
-                    try:
-                        await page.get_by_text(txt, exact=True).click(timeout=3000)
-                        code_page = page
-                        clicked = True
-                    except Exception:
-                        pass
-
-            if not clicked:
-                return None, "Confirm button not found. Please try again."
-
-            await code_page.wait_for_load_state("domcontentloaded", timeout=30000)
-            await code_page.wait_for_timeout(1500)
-
-            full_text = await code_page.locator("body").inner_text()
+            full_text = await safe_body_text(code_page)
             full_url = code_page.url
+            full_normalized = " ".join(
+                (full_text or "").lower().split()
+            )
 
-            if "This link is no longer valid" in full_text:
-                return None, "Link was expired. Please resend the code and try again."
+            result_expired_messages = (
+                "this link is no longer valid",
+                "please request again on the original device",
+                "link is no longer valid",
+                "此链接已失效",
+                "链接已失效",
+                "请在原设备上重新请求",
+                "este enlace ya no es válido",
+                "este enlace ya no es valido",
+            )
 
-            if "Please request again on the original device" in full_text:
-                return None, "Link was expired. Please resend the code and try again."
+            if any(
+                message in full_normalized
+                for message in result_expired_messages
+            ):
+                return None, (
+                    "Link was expired. "
+                    "Please resend the household code and try again."
+                )
 
-            match = re.search(r"\b\d{4}\b", full_text + " " + full_url)
+            match = re.search(
+                r"\b\d{4}\b",
+                f"{full_text} {full_url}",
+            )
 
             if match:
                 return match.group(0), None
 
-            return None, "Code page opened, but no 4-digit code found."
+            try:
+                timestamp = int(time.time())
+                screenshot_path = (
+                    f"/tmp/household_code_not_found_{timestamp}.png"
+                )
+                await code_page.screenshot(
+                    path=screenshot_path,
+                    full_page=True,
+                )
+                app.logger.error(
+                    "Household result opened but no 4-digit code found. URL=%s Screenshot=%s",
+                    full_url,
+                    screenshot_path,
+                )
+            except Exception:
+                pass
 
-        except Exception as e:
-            return None, f"System error: {str(e)}"
+            return None, (
+                "Code page opened, but no 4-digit household code was found."
+            )
+
+        except Exception as exc:
+            app.logger.exception(
+                "Household code system error: %s",
+                exc,
+            )
+            return None, (
+                "System is busy or timed out. "
+                "Please try again."
+            )
 
         finally:
             await browser.close()
