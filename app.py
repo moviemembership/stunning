@@ -1335,7 +1335,7 @@ async def _get_outlook_household_code_async(user_email):
                     "Please try again."
                 )
 
-            await page.wait_for_timeout(1200)
+            await page.wait_for_timeout(5000)
 
             current_pages = context.pages
             if len(current_pages) > len(pages_before):
