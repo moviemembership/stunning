@@ -25,6 +25,8 @@ socket.setdefaulttimeout(12)  # global timeout for IMAP socket
 EMAIL_PEEK_TOKEN = os.environ.get("EMAIL_PEEK_TOKEN")
 REPLACEMENT_FILE = os.getenv("REPLACEMENTS_FILE", "/etc/secrets/replacements.txt")
 
+XX39_ACCOUNTS_FILE = os.getenv("XX39_ACCOUNTS_FILE", "/etc/secrets/xx39_accounts.txt")
+
 CLICK_COUNT_FILE = os.getenv("CLICK_COUNT_FILE", "/var/data/shopee_clicks.json")
 
 SIGNIN_URL = "https://yzmen.4knaifei.cn"
@@ -525,44 +527,109 @@ async def wait_until_account_page_ready(page, timeout_seconds=20):
     return False, "Unable to verify account. Please try again."
 
 
-async def open_cdk_account(page, account_email, account_password):
-    login_value = f"{account_email}----{account_password}"
+async def open_cdk_account(
+    page,
+    account_email,
+    account_password
+):
+    cdk_password = build_cdk_password(
+        account_email,
+        account_password
+    )
+
+    login_value = (
+        f"{account_email}----"
+        f"{cdk_password}"
+    )
+
+    app.logger.info(
+        "Opening CDK account: %s "
+        "XX39=%s",
+        account_email,
+        cdk_password != account_password
+    )
+
     await page.goto(
         "https://yzmen.4knaifei.cn//#/login",
         wait_until="domcontentloaded",
         timeout=45000,
     )
-    login_input = page.locator("input:visible").first
-    await login_input.wait_for(state="visible", timeout=20000)
-    await login_input.fill(login_value)
+
+    login_input = (
+        page.locator(
+            "input:visible"
+        ).first
+    )
+
+    await login_input.wait_for(
+        state="visible",
+        timeout=20000
+    )
+
+    await login_input.fill(
+        login_value
+    )
 
     exchange_clicked = False
-    for label in ("Exchange", "兑换", "Redeem", "Submit", "Login"):
+
+    for label in (
+        "Exchange",
+        "兑换",
+        "Redeem",
+        "Submit",
+        "Login"
+    ):
         try:
             button = page.get_by_role(
                 "button",
-                name=re.compile(rf"^{re.escape(label)}$", re.I),
+                name=re.compile(
+                    rf"^{re.escape(label)}$",
+                    re.I
+                ),
             ).first
-            if await button.count() > 0 and await button.is_visible():
-                await button.click(timeout=10000, force=True)
+
+            if (
+                await button.count() > 0
+                and await button.is_visible()
+            ):
+                await button.click(
+                    timeout=10000,
+                    force=True
+                )
+
                 exchange_clicked = True
                 break
+
         except Exception:
             continue
 
     if not exchange_clicked:
         try:
-            buttons = page.locator("button:visible")
+            buttons = page.locator(
+                "button:visible"
+            )
+
             if await buttons.count() > 0:
-                await buttons.last.click(timeout=10000, force=True)
+                await buttons.last.click(
+                    timeout=10000,
+                    force=True
+                )
+
                 exchange_clicked = True
+
         except Exception:
             pass
 
     if not exchange_clicked:
-        return False, "Unable to click Exchange. Please try again."
+        return False, (
+            "Unable to click Exchange. "
+            "Please try again."
+        )
 
-    return await wait_until_account_page_ready(page, timeout_seconds=20)
+    return await wait_until_account_page_ready(
+        page,
+        timeout_seconds=20
+    )
 
 
 async def click_replace_and_hint_ok(page):
@@ -1608,6 +1675,95 @@ def household_code():
     return render_template("household_code.html",
                            email=entered if request.method == "POST" else "",
                            code=code, error=error)
+
+def should_append_xx39(
+    account_email,
+    account_password
+):
+    """
+    Return True only when BOTH the email and password
+    exactly match an entry in xx39_accounts.txt.
+
+    Format:
+        email----password
+    """
+
+    account_email = (
+        account_email or ""
+    ).strip().lower()
+
+    account_password = (
+        account_password or ""
+    ).strip()
+
+    try:
+        if not os.path.exists(
+            XX39_ACCOUNTS_FILE
+        ):
+            return False
+
+        with open(
+            XX39_ACCOUNTS_FILE,
+            "r",
+            encoding="utf-8"
+        ) as file:
+
+            for raw_line in file:
+                line = raw_line.strip()
+
+                if (
+                    not line
+                    or "----" not in line
+                ):
+                    continue
+
+                listed_email, listed_password = (
+                    line.split("----", 1)
+                )
+
+                listed_email = (
+                    listed_email
+                    .strip()
+                    .lower()
+                )
+
+                listed_password = (
+                    listed_password
+                    .strip()
+                )
+
+                if (
+                    listed_email
+                    == account_email
+                    and
+                    listed_password
+                    == account_password
+                ):
+                    return True
+
+    except Exception as exc:
+        app.logger.exception(
+            "Unable to read XX39 account list: %s",
+            exc
+        )
+
+    return False
+
+def build_cdk_password(
+    account_email,
+    account_password
+):
+    account_password = (
+        account_password or ""
+    ).strip()
+
+    if should_append_xx39(
+        account_email,
+        account_password
+    ):
+        return account_password + "XX39"
+
+    return account_password
 
 
 def load_replacements():
