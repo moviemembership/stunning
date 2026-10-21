@@ -2302,6 +2302,30 @@ def get_code():
         error=error
     )
 
+# =========================================================
+# SHORT CODE GUIDE PAGES
+# =========================================================
+
+@app.route("/s")
+def signin_guide():
+    return render_template(
+        "signin_guide.html",
+        video_url=(
+            "https://drive.google.com/file/d/"
+            "1oAgL0rm_lFVfNdBlyaXK0VpkaU2hu7wb/preview"
+        )
+    )
+
+
+@app.route("/v")
+def verification_guide():
+    return render_template(
+        "verification_guide.html",
+
+        # Replace this when your verification video is ready.
+        video_url=""
+    )
+
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     app.run(debug=True)
