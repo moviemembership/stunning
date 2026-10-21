@@ -2306,24 +2306,25 @@ def get_code():
 # SHORT CODE GUIDE PAGES
 # =========================================================
 
+@app.route("/video/<path:filename>")
+def video_files(filename):
+    return send_from_directory(
+        "video",
+        filename
+    )
+
+
 @app.route("/s")
 def signin_guide():
     return render_template(
-        "signin_guide.html",
-        video_url=(
-            "https://drive.google.com/file/d/"
-            "1oAgL0rm_lFVfNdBlyaXK0VpkaU2hu7wb/preview"
-        )
+        "signin_guide.html"
     )
 
 
 @app.route("/v")
 def verification_guide():
     return render_template(
-        "verification_guide.html",
-
-
-        video_url="https://drive.google.com/file/d/1R4mDb7tLf1_4Za8ugYVEA7SMLVuh0Xa1/preview"
+        "verification_guide.html"
     )
 
 # ---------------- MAIN ----------------
