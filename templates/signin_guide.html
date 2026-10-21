@@ -1,103 +1,66 @@
 {% extends "base.html" %}
 
-{% block title %}Cara Guna Sign In Code{% endblock %}
+{% block title %}
+Cara Guna Sign In Code
+{% endblock %}
 
 {% block content %}
 
 <style>
-.guide-video-clean {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    overflow: hidden;
-    border-radius: 16px;
-    background: #000;
-    margin-bottom: 24px;
-}
-
-.guide-video-clean iframe {
-    position: absolute;
-
-    /* slightly bigger than container */
-    width: 106%;
-    height: 118%;
-
-    /* crop the Google Drive player edges a little */
-    top: -9%;
-    left: -3%;
-
-    border: 0;
-}
-
-@media (max-width: 600px) {
-    .guide-video-clean {
-        aspect-ratio: 16 / 9;
-        border-radius: 14px;
-    }
-
-    .guide-video-clean iframe {
-        width: 106%;
-        height: 118%;
-        top: -9%;
-        left: -3%;
-    }
-}
-    
 .code-guide-page {
-    width: min(720px, calc(100% - 24px));
+    width: min(720px, calc(100% - 20px));
     margin: 0 auto;
-    padding: 35px 0 70px;
+    padding: 24px 0 60px;
 }
 
 .code-guide-card {
-    overflow: hidden;
-    padding: 24px;
+    padding: 18px;
     border: 1px solid #1f2b4a;
-    border-radius: 20px;
+    border-radius: 18px;
     background: #0e162e;
-    box-shadow: 0 14px 45px rgba(0,0,0,.15);
 }
 
 .code-guide-title {
-    margin: 0 0 7px;
+    margin: 0 0 6px;
     color: #fff;
-    font-size: 30px;
+    font-size: 28px;
     font-weight: 900;
 }
 
 .code-guide-subtitle {
-    margin: 0 0 22px;
+    margin: 0 0 18px;
     color: #94a3b8;
-    line-height: 1.55;
+    line-height: 1.5;
+}
+
+/* VIDEO */
+.guide-video-wrap {
+    width: 100%;
+    overflow: hidden;
+    border-radius: 14px;
+    background: #000;
+    margin-bottom: 22px;
 }
 
 .guide-video {
-    position: relative;
+    display: block;
     width: 100%;
-    aspect-ratio: 16 / 9;
-    overflow: hidden;
-    margin-bottom: 25px;
-    border-radius: 15px;
-    background: #111827;
+    height: auto;
+    max-height: 70vh;
+    background: #000;
+    object-fit: contain;
 }
 
-.guide-video iframe {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    border: 0;
-}
-
+/* STEPS */
 .steps-title {
-    margin: 0 0 14px;
+    margin: 0 0 12px;
     color: #fff;
     font-size: 20px;
 }
 
 .guide-steps {
     display: grid;
-    gap: 12px;
+    gap: 10px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -105,25 +68,25 @@
 
 .guide-step {
     display: grid;
-    grid-template-columns: 34px 1fr;
-    gap: 11px;
+    grid-template-columns: 32px 1fr;
+    gap: 10px;
     align-items: start;
-    padding: 13px;
+    padding: 12px;
     border: 1px solid #1f2b4a;
-    border-radius: 13px;
-    color: #dbe4f0;
+    border-radius: 12px;
     background: #111827;
-    line-height: 1.55;
+    color: #dbe4f0;
+    line-height: 1.5;
 }
 
 .step-number {
     display: grid;
     place-items: center;
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
-    color: #001017;
     background: #22d3ee;
+    color: #001017;
     font-size: 13px;
     font-weight: 900;
 }
@@ -132,37 +95,47 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 51px;
-    margin-top: 22px;
-    border-radius: 13px;
-    color: #fff;
+    min-height: 50px;
+    margin-top: 20px;
+    border-radius: 12px;
     background: #EE4D2D;
+    color: #fff;
     text-decoration: none;
     font-weight: 900;
 }
 
 .short-link {
-    margin-top: 13px;
+    margin-top: 12px;
+    text-align: center;
     color: #94a3b8;
     font-size: 13px;
-    text-align: center;
 }
 
 .short-link strong {
     color: #22d3ee;
 }
 
-@media(max-width:600px) {
+@media (max-width: 600px) {
     .code-guide-page {
-        padding-top: 20px;
+        width: calc(100% - 14px);
+        padding-top: 12px;
     }
 
     .code-guide-card {
-        padding: 17px;
+        padding: 14px;
+        border-radius: 14px;
     }
 
     .code-guide-title {
-        font-size: 25px;
+        font-size: 24px;
+    }
+
+    .guide-video-wrap {
+        border-radius: 10px;
+    }
+
+    .guide-video {
+        max-height: 62vh;
     }
 }
 </style>
@@ -180,29 +153,32 @@
             Tengok video dulu, kemudian ikut steps di bawah.
         </p>
 
+        <div class="guide-video-wrap">
+            <video
+                class="guide-video"
+                controls
+                playsinline
+                webkit-playsinline
+                preload="metadata"
+                controlslist="nodownload noplaybackrate"
+            >
+                <source
+                    src="/video/instruction_SignIn.mp4"
+                    type="video/mp4"
+                >
 
-        <div class="guide-video-clean">
-
-            <iframe
-                src="{{ video_url }}"
-                allow="autoplay"
-                allowfullscreen
-                title="Cara guna Sign In Code"
-            ></iframe>
-
+                Your browser does not support video playback.
+            </video>
         </div>
-
 
         <h2 class="steps-title">
             Steps
         </h2>
 
-
         <ol class="guide-steps">
 
             <li class="guide-step">
                 <span class="step-number">1</span>
-
                 <div>
                     Tekan
                     <strong>
@@ -213,43 +189,32 @@
                 </div>
             </li>
 
-
             <li class="guide-step">
                 <span class="step-number">2</span>
-
                 <div>
                     Tekan
                     <strong>Send Code</strong>.
                 </div>
             </li>
 
-
             <li class="guide-step">
                 <span class="step-number">3</span>
-
                 <div>
                     Masuk
-                    <strong>mantapnet.my/s</strong>
-                    dan tekan button
-                    <strong>Get Sign In Code</strong>
-                    di bawah.
+                    <strong>mantapnet.my/s</strong>.
                 </div>
             </li>
-
 
             <li class="guide-step">
                 <span class="step-number">4</span>
-
                 <div>
-                    Dekat page tu pilih
-                    <strong>Sign In Code</strong>.
+                    Tekan
+                    <strong>Get Sign In Code</strong>.
                 </div>
             </li>
 
-
             <li class="guide-step">
                 <span class="step-number">5</span>
-
                 <div>
                     Masukkan email dan password,
                     kemudian ambik code yang keluar.
@@ -258,14 +223,12 @@
 
         </ol>
 
-
         <a
             class="guide-button"
             href="/get-code?type=signin"
         >
             Get Sign In Code
         </a>
-
 
         <div class="short-link">
             Short link:
