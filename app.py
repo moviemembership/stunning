@@ -2322,8 +2322,8 @@ def verification_guide():
     return render_template(
         "verification_guide.html",
 
-        # Replace this when your verification video is ready.
-        video_url=""
+
+        video_url="https://drive.google.com/file/d/1R4mDb7tLf1_4Za8ugYVEA7SMLVuh0Xa1/preview"
     )
 
 # ---------------- MAIN ----------------
