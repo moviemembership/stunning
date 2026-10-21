@@ -5,6 +5,44 @@
 {% block content %}
 
 <style>
+.guide-video-clean {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: 16px;
+    background: #000;
+    margin-bottom: 24px;
+}
+
+.guide-video-clean iframe {
+    position: absolute;
+
+    /* slightly bigger than container */
+    width: 106%;
+    height: 118%;
+
+    /* crop the Google Drive player edges a little */
+    top: -9%;
+    left: -3%;
+
+    border: 0;
+}
+
+@media (max-width: 600px) {
+    .guide-video-clean {
+        aspect-ratio: 16 / 9;
+        border-radius: 14px;
+    }
+
+    .guide-video-clean iframe {
+        width: 106%;
+        height: 118%;
+        top: -9%;
+        left: -3%;
+    }
+}
+    
 .code-guide-page {
     width: min(720px, calc(100% - 24px));
     margin: 0 auto;
@@ -143,7 +181,7 @@
         </p>
 
 
-        <div class="guide-video">
+        <div class="guide-video-clean">
 
             <iframe
                 src="{{ video_url }}"
