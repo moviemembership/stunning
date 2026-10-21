@@ -2327,6 +2327,10 @@ def verification_guide():
         "verification_guide.html"
     )
 
+@app.route("/p")
+def use_password_picture():
+    return render_template("use_password.html")
+
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     app.run(debug=True)
