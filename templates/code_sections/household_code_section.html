@@ -349,89 +349,204 @@
 <script>
 document.addEventListener("DOMContentLoaded", function(){
 
-  const forms = document.querySelectorAll(".code-form");
+  const form = document.querySelector(".household-code-form");
 
-  forms.forEach(function(form){
+  if(!form){
+    return;
+  }
 
-    if(form.dataset.loadingReady === "1"){
+  const button = form.querySelector(".submit-btn");
+  const loading = form.querySelector(".loading-box");
+  const progressWrapper = form.querySelector(".progress-wrapper");
+  const progressBar = form.querySelector(".progress-bar");
+  const progressPercent = form.querySelector(".progress-percent");
+  const progressStep = form.querySelector(".progress-step");
+
+  let submitted = false;
+  let progress = 0;
+  let progressTimer = null;
+
+  function setProgress(percent, text){
+
+    progress = percent;
+
+    if(progressBar){
+      progressBar.style.width = percent + "%";
+    }
+
+    if(progressPercent){
+      progressPercent.textContent =
+        Math.floor(percent) + "%";
+    }
+
+    if(progressStep && text){
+      progressStep.textContent = text;
+    }
+  }
+
+
+  function startProgress(){
+
+    setProgress(
+      5,
+      "Preparing request..."
+    );
+
+    progressTimer = setInterval(function(){
+
+      if(progress < 20){
+
+        progress += 2;
+
+        setProgress(
+          progress,
+          "Preparing request..."
+        );
+
+      }
+      else if(progress < 40){
+
+        progress += 1;
+
+        setProgress(
+          progress,
+          "Connecting to household service..."
+        );
+
+      }
+      else if(progress < 60){
+
+        progress += 0.7;
+
+        setProgress(
+          progress,
+          "Checking latest household email..."
+        );
+
+      }
+      else if(progress < 80){
+
+        progress += 0.4;
+
+        setProgress(
+          progress,
+          "Opening temporary access link..."
+        );
+
+      }
+      else if(progress < 95){
+
+        progress += 0.15;
+
+        setProgress(
+          progress,
+          "Almost complete..."
+        );
+
+      }
+
+      if(progress >= 95){
+        setProgress(
+          95,
+          "Almost complete..."
+        );
+      }
+
+    }, 500);
+  }
+
+
+  form.addEventListener("submit", async function(e){
+
+    e.preventDefault();
+
+    if(submitted){
       return;
     }
 
-    form.dataset.loadingReady = "1";
+    submitted = true;
 
-    const button = form.querySelector(".submit-btn");
-    const loading = form.querySelector(".loading-box");
-    const progressWrapper = form.querySelector(".progress-wrapper");
-    const progressBar = form.querySelector(".progress-bar");
-    const progressPercent = form.querySelector(".progress-percent");
-    const progressStep = form.querySelector(".progress-step");
+    if(loading){
+      loading.style.display = "block";
+    }
 
-    let submitted = false;
+    if(progressWrapper){
+      progressWrapper.style.display = "block";
+    }
 
-    const steps = [
-      { percent:20, text:"Preparing request..." },
-      { percent:40, text:"Connecting to household service..." },
-      { percent:60, text:"Checking latest household email..." },
-      { percent:80, text:"Opening temporary access link..." },
-      { percent:95, text:"Almost complete..." }
-    ];
+    if(progressStep){
+      progressStep.style.display = "block";
+    }
 
-    form.addEventListener("submit", function(e){
+    if(button){
+      button.disabled = true;
+      button.innerText = "Please wait...";
+    }
 
-      if(submitted){
-        e.preventDefault();
-        return;
+    startProgress();
+
+    try{
+
+      const response = await fetch(
+        form.action,
+        {
+          method: "POST",
+          body: new FormData(form),
+          credentials: "same-origin"
+        }
+      );
+
+      if(!response.ok){
+        throw new Error(
+          "HTTP " + response.status
+        );
       }
 
-      submitted = true;
+      const html = await response.text();
 
-      if(loading){
-        loading.style.display = "block";
-      }
+      clearInterval(progressTimer);
 
-      if(progressWrapper){
-        progressWrapper.style.display = "block";
+      setProgress(
+        100,
+        "Complete"
+      );
+
+      await new Promise(function(resolve){
+        setTimeout(resolve, 300);
+      });
+
+      document.open();
+      document.write(html);
+      document.close();
+
+    }
+    catch(error){
+
+      clearInterval(progressTimer);
+
+      submitted = false;
+
+      if(button){
+        button.disabled = false;
+        button.innerText =
+          "Get Household Code";
       }
 
       if(progressStep){
-        progressStep.style.display = "block";
+        progressStep.textContent =
+          "Request failed. Please try again.";
       }
 
-      if(button){
-        button.disabled = true;
-        button.innerText = "Please wait...";
+      if(progressPercent){
+        progressPercent.textContent =
+          "Error";
       }
 
-      let index = 0;
-
-      function updateProgress(){
-
-        if(index >= steps.length){
-          return;
-        }
-
-        const step = steps[index];
-
-        if(progressBar){
-          progressBar.style.width = step.percent + "%";
-        }
-
-        if(progressPercent){
-          progressPercent.innerText = step.percent + "%";
-        }
-
-        if(progressStep){
-          progressStep.innerText =
-            step.percent + "% " + step.text;
-        }
-
-        index++;
-
-        setTimeout(updateProgress, 6000);
-      }
-
-      updateProgress();
-    });
+      console.error(
+        "Household request failed:",
+        error
+      );
+    }
 
   });
 
