@@ -386,23 +386,102 @@ document.addEventListener("DOMContentLoaded", function(){
     const progressStep = form.querySelector(".progress-step");
 
     let submitted = false;
+    let progressTimer = null;
+    let progress = 0;
 
-    const steps = [
-      { percent:20, text:"Preparing request..." },
-      { percent:40, text:"Connecting to account..." },
-      { percent:60, text:"Checking latest email..." },
-      { percent:80, text:"Reading latest code..." },
-      { percent:95, text:"Almost complete..." }
-    ];
+    function setProgress(percent, text){
 
-    form.addEventListener("submit", function(e){
+      progress = percent;
+
+      if(progressBar){
+        progressBar.style.width = percent + "%";
+      }
+
+      if(progressPercent){
+        progressPercent.innerText =
+          Math.floor(percent) + "%";
+      }
+
+      if(progressStep && text){
+        progressStep.innerText = text;
+      }
+    }
+
+
+    function startProgress(){
+
+      setProgress(
+        5,
+        "Preparing request..."
+      );
+
+      progressTimer = setInterval(function(){
+
+        if(progress < 20){
+          progress += 2;
+          setProgress(
+            progress,
+            "Preparing request..."
+          );
+        }
+
+        else if(progress < 40){
+          progress += 1;
+          setProgress(
+            progress,
+            "Connecting to account..."
+          );
+        }
+
+        else if(progress < 60){
+          progress += 0.7;
+          setProgress(
+            progress,
+            "Checking latest email..."
+          );
+        }
+
+        else if(progress < 80){
+          progress += 0.4;
+          setProgress(
+            progress,
+            "Reading latest code..."
+          );
+        }
+
+        else if(progress < 95){
+          progress += 0.15;
+          setProgress(
+            progress,
+            "Almost complete..."
+          );
+        }
+
+        if(progress >= 95){
+          progress = 95;
+
+          setProgress(
+            95,
+            "Almost complete..."
+          );
+        }
+
+      }, 500);
+    }
+
+
+    form.addEventListener("submit", async function(e){
+
+      // IMPORTANT:
+      // Stop normal POST navigation.
+      e.preventDefault();
 
       if(submitted){
-        e.preventDefault();
         return;
       }
 
       submitted = true;
+
 
       if(loading){
         loading.style.display = "block";
@@ -421,42 +500,100 @@ document.addEventListener("DOMContentLoaded", function(){
         button.innerText = "Please wait...";
       }
 
-      let index = 0;
 
-      function updateProgress(){
+      startProgress();
 
-        if(index >= steps.length){
-          return;
+
+      try{
+
+        const formData = new FormData(form);
+
+        const response = await fetch(
+          form.action,
+          {
+            method: "POST",
+            body: formData,
+            credentials: "same-origin"
+          }
+        );
+
+
+        if(!response.ok){
+          throw new Error(
+            "HTTP " + response.status
+          );
         }
 
-        const step = steps[index];
 
-        if(progressBar){
-          progressBar.style.width = step.percent + "%";
+        const html = await response.text();
+
+
+        clearInterval(progressTimer);
+
+
+        setProgress(
+          100,
+          "Complete"
+        );
+
+
+        // Let user see 100% briefly.
+        await new Promise(function(resolve){
+          setTimeout(resolve, 300);
+        });
+
+
+        // Replace current page with the Flask response.
+        document.open();
+        document.write(html);
+        document.close();
+
+
+      }
+      catch(error){
+
+        clearInterval(progressTimer);
+
+        submitted = false;
+
+
+        if(button){
+          button.disabled = false;
+          button.innerText =
+            "Get Latest Code";
         }
 
-        if(progressPercent){
-          progressPercent.innerText = step.percent + "%";
-        }
 
         if(progressStep){
-          progressStep.innerText = step.text;
+          progressStep.innerText =
+            "Request failed. Please try again.";
         }
 
-        index++;
 
-        setTimeout(updateProgress, 6000);
+        if(progressPercent){
+          progressPercent.innerText =
+            "Error";
+        }
+
+
+        console.error(
+          "Get code request failed:",
+          error
+        );
+
       }
 
-      updateProgress();
     });
 
   });
 
 });
 
+
 function showToast(text){
-  const toast = document.getElementById("toastMsg");
+
+  const toast =
+    document.getElementById("toastMsg");
 
   if(!toast){
     return;
@@ -470,27 +607,40 @@ function showToast(text){
   }, 1800);
 }
 
+
 function copyCode(button){
-  const card = button.closest(".outlook-card");
-  const codeElement = card.querySelector(".code-value");
+
+  const card =
+    button.closest(".outlook-card");
+
+  const codeElement =
+    card.querySelector(".code-value");
 
   if(!codeElement){
     return;
   }
 
-  const code = codeElement.innerText.trim();
+  const code =
+    codeElement.innerText.trim();
 
-  navigator.clipboard.writeText(code).then(function(){
-    showToast("Code copied!");
-  });
+  navigator.clipboard.writeText(code)
+    .then(function(){
+      showToast("Code copied!");
+    });
 }
 
+
 function wrongCode(button){
-  const card = button.closest(".outlook-card");
-  const form = card.querySelector(".code-form");
+
+  const card =
+    button.closest(".outlook-card");
+
+  const form =
+    card.querySelector(".code-form");
 
   if(form){
     form.requestSubmit();
   }
+
 }
 </script>
