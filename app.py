@@ -996,22 +996,43 @@ async def retrieve_all_latest_codes(
     page,
     max_clicks=10,
 ):
-    """
-    Keep clicking Replace until no newer verification code remains.
-    """
+    started_at = time.monotonic()
+
     for attempt in range(max_clicks):
         previous_history = await get_top_history_signature(page)
 
+        attempt_started = time.monotonic()
+
         app.logger.info(
-            "Replace attempt %s, previous history=%r",
+            "Replace attempt %s started. "
+            "Total elapsed=%.2fs Previous history=%r",
             attempt + 1,
+            attempt_started - started_at,
             previous_history,
         )
 
         clicked, click_error = await click_replace_and_hint_ok(page)
 
+        click_finished = time.monotonic()
+
+        app.logger.info(
+            "Replace attempt %s click/confirm finished in %.2fs",
+            attempt + 1,
+            click_finished - attempt_started,
+        )
+
         if not clicked:
+            app.logger.info(
+                "Replace attempt %s failed before result wait. "
+                "Total elapsed=%.2fs Error=%s",
+                attempt + 1,
+                time.monotonic() - started_at,
+                click_error,
+            )
+
             return False, click_error
+
+        wait_started = time.monotonic()
 
         result = await wait_for_replace_result(
             page,
@@ -1019,10 +1040,18 @@ async def retrieve_all_latest_codes(
             timeout_seconds=45,
         )
 
+        wait_finished = time.monotonic()
+
         app.logger.info(
-            "Replace attempt %s result=%s",
+            "Replace attempt %s result=%s "
+            "Result wait=%.2fs "
+            "Attempt total=%.2fs "
+            "Overall total=%.2fs",
             attempt + 1,
             result,
+            wait_finished - wait_started,
+            wait_finished - attempt_started,
+            wait_finished - started_at,
         )
 
         if result == "expired":
@@ -1038,9 +1067,13 @@ async def retrieve_all_latest_codes(
             await page.wait_for_timeout(500)
             continue
 
-        return False, "Please request the code again and retry."
+        return False, (
+            "Please request the code again and retry."
+        )
 
-    return False, "Too many codes were received. Please try again."
+    return False, (
+        "Too many codes were received. Please try again."
+    )
 
 
 def parse_history_time(time_text):
