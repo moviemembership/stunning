@@ -6,7 +6,7 @@
     <form
       method="POST"
       action="{{ url_for('get_code') }}?type=verification"
-      class="code-form">
+      class="code-form verification-code-form"
     
       <input type="hidden" name="code_type" value="verification">
 
@@ -22,7 +22,7 @@
        value="{{ password or '' }}"
        required>
 
-      <button class="outlook-btn" type="submit" id="submitBtn">
+      <button class="outlook-btn submit-btn" type="submit">
         Get Latest Code
       </button>
 
@@ -225,107 +225,312 @@
 </style>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", function(){
 
-  const form = document.getElementById("code-form");
-  const button = document.getElementById("submitBtn");
-  const loading = document.getElementById("loading");
+  const form =
+    document.querySelector(".verification-code-form");
 
-  let submitted = false;
+  if(!form){
+    return;
+  }
 
-  form.addEventListener("submit", function (e) {
+  const button =
+    form.querySelector(".submit-btn");
 
-    if (submitted) {
-      e.preventDefault();
-      return false;
-    }
+  const loading =
+    form.querySelector(".loading-box");
 
-    submitted = true;
+  const progressWrapper =
+    form.querySelector(".progress-wrapper");
 
-    loading.style.display = "block";
+  const progressBar =
+    form.querySelector(".progress-bar");
 
-    button.disabled = true;
-    button.innerText = "Please wait...";
-    button.style.opacity = "0.6";
-    button.style.cursor = "not-allowed";
-    button.style.pointerEvents = "none";
-  });
+  const progressPercent =
+    form.querySelector(".progress-percent");
 
-});
-
-document.addEventListener("DOMContentLoaded", function () {
-  const form = document.getElementById("code-form");
-  const button = document.getElementById("submitBtn");
-  const loading = document.getElementById("loading");
-  const progressWrapper = document.getElementById("progressWrapper");
-  const progressBar = form.querySelector(".progress-bar");
-  const progressPercent = form.querySelector(".progress-percent");
-  const progressStep = form.querySelector(".progress-step");
+  const progressStep =
+    form.querySelector(".progress-step");
 
   let submitted = false;
+  let progress = 0;
+  let progressTimer = null;
 
-  const steps = [
-    { percent: 20, text: "20% Connecting..." },
-    { percent: 40, text: "40% Checking account..." },
-    { percent: 60, text: "60% Searching 6-digit code..." },
-    { percent: 80, text: "80% Trying latest verification..." },
-    { percent: 95, text: "95% Almost done..." }
-  ];
 
-  form.addEventListener("submit", function (e) {
-    if (submitted) {
-      e.preventDefault();
-      return false;
+  function setProgress(percent, text){
+
+    progress = percent;
+
+    if(progressBar){
+      progressBar.style.width =
+        percent + "%";
     }
 
-    submitted = true;
+    if(progressPercent){
+      progressPercent.textContent =
+        Math.floor(percent) + "%";
+    }
 
-    loading.style.display = "block";
-    progressWrapper.style.display = "block";
-    progressStep.style.display = "block";
+    if(progressStep && text){
+      progressStep.textContent = text;
+    }
+  }
 
-    button.disabled = true;
-    button.innerText = "Please wait...";
 
-    let index = 0;
+  function startProgress(){
 
-    function updateProgress() {
-      if (index < steps.length) {
-        progressBar.style.width = step.percent + "%";
-        progressPercent.textContent = step.percent + "%";
-        progressStep.textContent = step.text;
-        index++;
-        setTimeout(updateProgress, 6000);
+    setProgress(
+      5,
+      "Preparing request..."
+    );
+
+    progressTimer = setInterval(function(){
+
+      if(progress < 20){
+
+        progress += 2;
+
+        setProgress(
+          progress,
+          "Preparing request..."
+        );
+
       }
+      else if(progress < 40){
+
+        progress += 1;
+
+        setProgress(
+          progress,
+          "Connecting to account..."
+        );
+
+      }
+      else if(progress < 60){
+
+        progress += 0.7;
+
+        setProgress(
+          progress,
+          "Checking latest verification email..."
+        );
+
+      }
+      else if(progress < 80){
+
+        progress += 0.4;
+
+        setProgress(
+          progress,
+          "Reading latest verification code..."
+        );
+
+      }
+      else if(progress < 95){
+
+        progress += 0.15;
+
+        setProgress(
+          progress,
+          "Almost complete..."
+        );
+
+      }
+
+      if(progress >= 95){
+
+        setProgress(
+          95,
+          "Almost complete..."
+        );
+
+      }
+
+    }, 500);
+  }
+
+
+  form.addEventListener("submit", async function(e){
+
+    e.preventDefault();
+
+    if(submitted){
+      return;
     }
 
-    updateProgress();
+    submitted = true;
+
+
+    if(loading){
+      loading.style.display = "block";
+    }
+
+    if(progressWrapper){
+      progressWrapper.style.display = "block";
+    }
+
+    if(progressStep){
+      progressStep.style.display = "block";
+    }
+
+    if(button){
+      button.disabled = true;
+      button.innerText = "Please wait...";
+    }
+
+
+    startProgress();
+
+
+    try{
+
+      const response = await fetch(
+        form.action,
+        {
+          method: "POST",
+          body: new FormData(form),
+          credentials: "same-origin"
+        }
+      );
+
+
+      if(!response.ok){
+        throw new Error(
+          "HTTP " + response.status
+        );
+      }
+
+
+      const html =
+        await response.text();
+
+
+      clearInterval(progressTimer);
+
+
+      setProgress(
+        100,
+        "Complete"
+      );
+
+
+      await new Promise(function(resolve){
+
+        setTimeout(
+          resolve,
+          300
+        );
+
+      });
+
+
+      document.open();
+      document.write(html);
+      document.close();
+
+
+    }
+    catch(error){
+
+      clearInterval(progressTimer);
+
+      submitted = false;
+
+
+      if(button){
+
+        button.disabled = false;
+
+        button.innerText =
+          "Get Latest Code";
+
+      }
+
+
+      if(progressStep){
+
+        progressStep.textContent =
+          "Request failed. Please try again.";
+
+      }
+
+
+      if(progressPercent){
+
+        progressPercent.textContent =
+          "Error";
+
+      }
+
+
+      console.error(
+        "Verification request failed:",
+        error
+      );
+
+    }
+
   });
+
 });
+
 
 function showToast(text){
-  const toast = document.getElementById("toastMsg");
-  if(!toast) return;
+
+  const toast =
+    document.getElementById("toastMsg");
+
+  if(!toast){
+    return;
+  }
 
   toast.innerText = text;
+
   toast.classList.add("show");
 
   setTimeout(function(){
+
     toast.classList.remove("show");
+
   }, 1800);
 }
 
-function copyCode(){
-  const code = document.getElementById("codeValue").innerText;
 
-  navigator.clipboard.writeText(code).then(function(){
-    showToast("Code copied!");
-  });
+function copyCode(){
+
+  const codeElement =
+    document.getElementById("codeValue");
+
+  if(!codeElement){
+    return;
+  }
+
+  const code =
+    codeElement.innerText.trim();
+
+  navigator.clipboard
+    .writeText(code)
+    .then(function(){
+
+      showToast(
+        "Code copied!"
+      );
+
+    });
+
 }
+
 
 function wrongCode(){
-  document.getElementById("code-form").requestSubmit();
+
+  const form =
+    document.querySelector(
+      ".verification-code-form"
+    );
+
+  if(form){
+    form.requestSubmit();
+  }
+
 }
 </script>
-
-<div id="toastMsg" class="toast-msg"></div>
