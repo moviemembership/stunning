@@ -1016,7 +1016,7 @@ async def retrieve_all_latest_codes(
         result = await wait_for_replace_result(
             page,
             previous_history=previous_history,
-            timeout_seconds=30,
+            timeout_seconds=45,
         )
 
         app.logger.info(
