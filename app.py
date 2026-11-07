@@ -634,166 +634,153 @@ async def open_cdk_account(
 
 async def click_replace_and_hint_ok(page):
     """
-    Click Replace and verify that the Hint modal actually opens.
-    Then click its OK button.
+    Click Replace once.
+
+    If the Hint modal appears:
+        click OK.
+
+    If the Hint modal does NOT appear:
+        continue anyway and let wait_for_replace_result()
+        decide whether the request succeeded or failed.
     """
 
-    max_replace_attempts = 3
+    try:
+        replace_buttons = page.locator(
+            'button:visible:has-text("Click Replace")'
+        )
 
-    for attempt in range(1, max_replace_attempts + 1):
-        try:
-            replace_buttons = page.locator(
-                'button:visible:has-text("Click Replace")'
-            )
+        count = await replace_buttons.count()
 
-            count = await replace_buttons.count()
-
-            if count == 0:
-                return False, (
-                    "Unable to find the Replace button. "
-                    "Please try again."
-                )
-
-            # Usually the visible account modal has the last matching button.
-            replace_button = replace_buttons.last
-
-            await replace_button.scroll_into_view_if_needed()
-
-            app.logger.info(
-                "Clicking Replace, attempt %s",
-                attempt,
-            )
-
-            # Normal click first
-            try:
-                await replace_button.click(
-                    timeout=5000
-                )
-            except Exception:
-                # Force click only as fallback
-                await replace_button.click(
-                    timeout=5000,
-                    force=True,
-                )
-
-        except Exception as exc:
-            app.logger.exception(
-                "Replace click attempt %s failed: %s",
-                attempt,
-                exc,
-            )
-
-            if attempt < max_replace_attempts:
-                await page.wait_for_timeout(600)
-                continue
-
+        if count == 0:
             return False, (
-                "Unable to click Replace. Please try again."
-            )
-
-        # -------------------------------------------------
-        # Confirm that the Hint modal really appeared
-        # -------------------------------------------------
-        hint_modal = page.locator(
-            ".ant-modal-confirm"
-        ).filter(
-            has_text=re.compile(
-                r"Hint|Please click to obtain",
-                re.I,
-            )
-        ).last
-
-        try:
-            await hint_modal.wait_for(
-                state="visible",
-                timeout=5000,
-            )
-
-            app.logger.info(
-                "Hint modal appeared after Replace attempt %s",
-                attempt,
-            )
-
-        except Exception:
-            app.logger.warning(
-                "Replace attempt %s did not open Hint modal.",
-                attempt,
-            )
-
-            if attempt < max_replace_attempts:
-                await page.wait_for_timeout(700)
-                continue
-
-            try:
-                timestamp = int(time.time())
-
-                screenshot_path = (
-                    f"/tmp/replace_no_hint_{timestamp}.png"
-                )
-
-                await page.screenshot(
-                    path=screenshot_path,
-                    full_page=True,
-                )
-
-                app.logger.error(
-                    "Replace was clicked but Hint did not appear. "
-                    "URL=%s Screenshot=%s",
-                    page.url,
-                    screenshot_path,
-                )
-
-            except Exception:
-                pass
-
-            return False, (
-                "The confirmation window did not appear. "
+                "Unable to find the Replace button. "
                 "Please try again."
             )
 
-        # -------------------------------------------------
-        # Click OK inside the confirmed Hint modal
-        # -------------------------------------------------
+        replace_button = replace_buttons.last
+
+        await replace_button.scroll_into_view_if_needed()
+
+        app.logger.info(
+            "Clicking Replace once."
+        )
+
         try:
-            ok_button = hint_modal.locator(
-                "button"
-            ).filter(
-                has_text=re.compile(r"^OK$", re.I)
-            ).last
+            await replace_button.click(
+                timeout=5000
+            )
 
-            await ok_button.wait_for(
-                state="visible",
+        except Exception:
+            await replace_button.click(
                 timeout=5000,
+                force=True,
             )
 
-            await ok_button.click(
-                timeout=5000,
+    except Exception as exc:
+
+        app.logger.exception(
+            "Unable to click Replace: %s",
+            exc,
+        )
+
+        return False, (
+            "Unable to click Replace. "
+            "Please try again."
+        )
+
+
+    # -------------------------------------------------
+    # Wait briefly for Hint modal
+    # -------------------------------------------------
+
+    hint_modal = page.locator(
+        ".ant-modal-confirm"
+    ).filter(
+        has_text=re.compile(
+            r"Hint|Please click to obtain",
+            re.I,
+        )
+    ).last
+
+
+    try:
+
+        await hint_modal.wait_for(
+            state="visible",
+            timeout=5000,
+        )
+
+        app.logger.info(
+            "Hint modal appeared."
+        )
+
+
+    except Exception:
+
+        # IMPORTANT:
+        # No Hint is NOT treated as failure anymore.
+        app.logger.warning(
+            "Hint modal did not appear. "
+            "Continuing to wait for Replace result."
+        )
+
+        return True, None
+
+
+    # -------------------------------------------------
+    # Hint appeared -> click OK
+    # -------------------------------------------------
+
+    try:
+
+        ok_button = hint_modal.locator(
+            "button"
+        ).filter(
+            has_text=re.compile(
+                r"^OK$",
+                re.I
             )
+        ).last
 
-            app.logger.info(
-                "Hint OK clicked successfully."
-            )
+        await ok_button.wait_for(
+            state="visible",
+            timeout=5000,
+        )
 
-            # Do not wait for the modal to become hidden.
-            await page.wait_for_timeout(300)
+        await ok_button.click(
+            timeout=5000,
+        )
 
-            return True, None
+        app.logger.info(
+            "Hint OK clicked successfully."
+        )
 
-        except Exception as exc:
-            app.logger.exception(
-                "Unable to click Hint OK: %s",
-                exc,
-            )
+        await page.wait_for_timeout(300)
 
-            try:
-                # JavaScript fallback, limited to the Hint modal
-                clicked = await hint_modal.evaluate("""
-                    modal => {
-                        const buttons = Array.from(
+        return True, None
+
+
+    except Exception as exc:
+
+        app.logger.warning(
+            "Normal Hint OK click failed: %s",
+            exc,
+        )
+
+        # JavaScript fallback
+        try:
+
+            clicked = await hint_modal.evaluate("""
+                modal => {
+
+                    const buttons =
+                        Array.from(
                             modal.querySelectorAll("button")
                         );
 
-                        const okButton = buttons.find(button => {
+                    const okButton =
+                        buttons.find(button => {
+
                             const text = (
                                 button.innerText ||
                                 button.textContent ||
@@ -803,31 +790,43 @@ async def click_replace_and_hint_ok(page):
                             return text === "OK";
                         });
 
-                        if (!okButton) {
-                            return false;
-                        }
-
-                        okButton.click();
-                        return true;
+                    if (!okButton) {
+                        return false;
                     }
-                """)
 
-                if clicked:
-                    await page.wait_for_timeout(300)
-                    return True, None
+                    okButton.click();
 
-            except Exception as js_exc:
-                app.logger.exception(
-                    "JavaScript OK click failed: %s",
-                    js_exc,
+                    return true;
+                }
+            """)
+
+            if clicked:
+
+                app.logger.info(
+                    "Hint OK clicked using JS fallback."
                 )
 
-            return False, (
-                "Unable to confirm the request. "
-                "Please try again."
+                await page.wait_for_timeout(300)
+
+                return True, None
+
+
+        except Exception as js_exc:
+
+            app.logger.warning(
+                "JavaScript Hint OK click failed: %s",
+                js_exc,
             )
 
-    return False, "Unable to click Replace. Please try again."
+
+        # Even if Hint appeared but OK could not be clicked,
+        # continue to result detection.
+        app.logger.warning(
+            "Unable to click Hint OK. "
+            "Continuing to wait for Replace result."
+        )
+
+        return True, None
 
 async def get_top_history_signature(page):
     """
