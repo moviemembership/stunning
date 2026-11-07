@@ -965,7 +965,7 @@ async def wait_for_replace_result(
         ):
             return "success"
 
-        await page.wait_for_timeout(100)
+        await page.wait_for_timeout(500)
 
     try:
         timestamp = int(time.time())
