@@ -1,117 +1,96 @@
-                    # Search:
-                    # Your verification code
-                    # Kod pengesahan anda
-                    code, error = (
-                        get_mantapnet_verification_code(
-                            email_value
-                        )
-                    )
+import os
+import threading
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
+from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
+import asyncio
+import re
+from datetime import datetime, timedelta, timezone, UTC
+from flask import Flask, request, render_template, redirect, session, jsonify, send_from_directory, send_file
+from werkzeug.security import generate_password_hash, check_password_hash
+from email_validator import validate_email, EmailNotValidError
+import smtplib, ssl, secrets, time
+from email.message import EmailMessage
+import imaplib, email, re as _re
+import requests
+from bs4 import BeautifulSoup
+import pathlib
+import hashlib
+import os, imaplib, email, json
+from flask import abort
+import socket
+from urllib.parse import quote
+socket.setdefaulttimeout(12)  # global timeout for IMAP socket
 
-                elif not password_value:
-                    error = (
-                        "Please enter both email and password."
-                    )
+EMAIL_PEEK_TOKEN = os.environ.get("EMAIL_PEEK_TOKEN")
+REPLACEMENT_FILE = os.getenv("REPLACEMENTS_FILE", "/etc/secrets/replacements.txt")
 
-                else:
-                    try:
-                        code, error = get_verification_code(
-                            email_value,
-                            password_value
-                        )
+XX39_ACCOUNTS_FILE = os.getenv("XX39_ACCOUNTS_FILE", "/etc/secrets/xx39_accounts.txt")
 
-                    except Exception as exc:
-                        app.logger.exception(
-                            "Verification code error: %s",
-                            exc
-                        )
+CLICK_COUNT_FILE = os.getenv("CLICK_COUNT_FILE", "/var/data/shopee_clicks.json")
 
-                        error = (
-                            "System is busy or timed out. "
-                            "Please try again."
-                        )
+SIGNIN_URL = "https://yzmen.4knaifei.cn"
 
-            # =============================================
-            # HOUSEHOLD CODE
-            # =============================================
-            elif selected == "household":
+signin_playwright = None
+signin_browser = None
+signin_lock = threading.Lock()
+signin_request_count = 0
 
-                if not email_value:
-                    error = "Please enter the account email."
+OUTLOOK_URL = "https://yz.naifei.store/#/login"
 
-                elif is_mantapnet_email:
-                    # Use your existing Mantapnet household
-                    # mailbox method.
-                    try:
-                        code, error = household_code_from_mailbox(
-                            email_value
-                        )
+AUTO_SIGNIN_URL = "https://yzmen.4knaifei.cn"
 
-                    except NameError:
-                        # Use this only if you have not yet
-                        # extracted /household-code into a helper.
-                        error = (
-                            "The Mantapnet household helper has "
-                            "not been connected yet."
-                        )
+#------------ PAYMENT GATEWAY-------------
 
-                else:
-                    # Outlook/Hotmail household method.
-                    try:
-                        code, error = (
-                            get_outlook_household_code(
-                                email_value
-                            )
-                        )
+TOYYIBPAY_SANDBOX_SECRET_KEY = os.environ.get("SANDBOX_SERCET_CODE")
+TOYYIBPAY_SANDBOX_CATEGORY_CODE = os.environ.get("SANDBOX_CATEGORY_CODE")
+TOYYIBPAY_SANDBOX_BASE = "https://dev.toyyibpay.com"
 
-                    except Exception as exc:
-                        app.logger.exception(
-                            "Household code error: %s",
-                            exc
-                        )
+# ---------------- CONFIG ----------------
 
-                        error = (
-                            "System is busy or timed out. "
-                            "Please try again."
-                        )
+IMAP_HOST = "mail.mantapnet.com"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL")
+ADMIN_PASS = os.environ.get("ADMIN_PASS")
 
-    return render_template(
-        "get_code.html",
-        selected=selected,
-        email=email_value,
-        password=password_value,
-        code=code,
-        error=error
-    )
+# ---------------- FLASK APP ----------------
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "devkey")  # required for session
 
-# =========================================================
-# SHORT CODE GUIDE PAGES
-# =========================================================
+# ---------------- HELPERS ----------------
+def imap_connect():
+    m = imaplib.IMAP4_SSL(IMAP_HOST)
+    m.login(ADMIN_EMAIL, ADMIN_PASS)
+    m.select("INBOX")
+    return m
 
-@app.route("/video/<path:filename>")
-def video_files(filename):
-    return send_from_directory(
-        "video",
-        filename
-    )
+def imap_uid_safe(mail, *args, retries=2):
+    """
+    Run mail.uid(...) with auto-reconnect on EOF/abort.
+    Returns (mail, (status, data)) so you always keep the newest connection.
+    """
+    last_err = None
+    for attempt in range(retries + 1):
+        try:
+            return mail, mail.uid(*args)
+        except (imaplib.IMAP4.abort, imaplib.IMAP4.error, OSError) as e:
+            last_err = e
+            if attempt >= retries:
+                raise
+            try:
+                mail.logout()
+            except Exception:
+                pass
+            mail = imap_connect()
+    raise last_err
 
-
-@app.route("/s")
-def signin_guide():
-    return render_template(
-        "signin_guide.html"
-    )
-
-
-@app.route("/v")
-def verification_guide():
-    return render_template(
-        "verification_guide.html"
-    )
-
-@app.route("/p")
-def use_password_picture():
-    return render_template("use_password.html")
-
-# ---------------- MAIN ----------------
-if __name__ == "__main__":
-    app.run(debug=True)
+def imap_call(mail, fn, *args, retries=3):
+    """
+    fn: "uid" or "noop"
+    returns (mail, result)
+    """
+    last = None
+    for _ in range(retries):
+        try:
+            if fn == "uid":
+                return mail, mail.uid(*args)
+            if fn == "noop":
