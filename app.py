@@ -1322,6 +1322,7 @@ async def _get_outlook_household_code_async(user_email):
 
     The external site can load in English, Chinese, or Spanish.
     """
+
     user_email = (user_email or "").strip()
 
     async with async_playwright() as p:
@@ -1350,13 +1351,16 @@ async def _get_outlook_household_code_async(user_email):
             )
 
             email_input = page.locator("input:visible").first
+
             await email_input.wait_for(
                 state="visible",
                 timeout=30000,
             )
+
             await email_input.fill(user_email)
 
             query_clicked = False
+
             query_names = (
                 "Query verification code",
                 "Get verification code",
@@ -1383,30 +1387,47 @@ async def _get_outlook_household_code_async(user_email):
                             timeout=10000,
                             force=True,
                         )
+
                         query_clicked = True
                         break
+
                 except Exception:
                     continue
 
             if not query_clicked:
                 try:
-                    buttons = page.locator("button:visible")
-                    button_count = await buttons.count()
-                    for index in range(button_count):
-                        button = buttons.nth(index)
+                    buttons = page.locator(
+                        "button:visible"
+                    )
+
+                    button_count = (
+                        await buttons.count()
+                    )
+
+                    for index in range(
+                        button_count
+                    ):
+                        button = buttons.nth(
+                            index
+                        )
+
                         try:
                             button_text = (
                                 await button.inner_text()
                             ).strip()
+
                             if button_text:
                                 await button.click(
                                     timeout=10000,
                                     force=True,
                                 )
+
                                 query_clicked = True
                                 break
+
                         except Exception:
                             continue
+
                 except Exception:
                     pass
 
@@ -1416,7 +1437,15 @@ async def _get_outlook_household_code_async(user_email):
                     "Please try again."
                 )
 
-            deadline = time.monotonic() + 20
+
+            # ==========================================
+            # WAIT FOR RESULT MODAL
+            # ==========================================
+
+            deadline = (
+                time.monotonic() + 20
+            )
+
             confirm_button = None
 
             no_code_messages = (
@@ -1443,28 +1472,55 @@ async def _get_outlook_household_code_async(user_email):
             )
 
             confirm_texts = {
-                "OK", "Confirm", "Yes",
-                "确定", "確認", "确认",
-                "Aceptar", "Confirmar", "Sí", "Si",
+                "OK",
+                "Confirm",
+                "Yes",
+                "确定",
+                "確認",
+                "确认",
+                "Aceptar",
+                "Confirmar",
+                "Sí",
+                "Si",
             }
 
-            while time.monotonic() < deadline:
-                body_text = await safe_body_text(page)
-                normalized = " ".join(
-                    (body_text or "").lower().split()
+            while (
+                time.monotonic()
+                < deadline
+            ):
+
+                body_text = (
+                    await safe_body_text(
+                        page
+                    )
                 )
 
-                if any(message in normalized for message in no_code_messages):
+                normalized = " ".join(
+                    (
+                        body_text or ""
+                    ).lower().split()
+                )
+
+                if any(
+                    message in normalized
+                    for message
+                    in no_code_messages
+                ):
                     return None, (
                         "No household code found. "
-                        "Please send the household code email first "
-                        "and try again."
+                        "Please send the household "
+                        "code email first and try again."
                     )
 
-                if any(message in normalized for message in expired_messages):
+                if any(
+                    message in normalized
+                    for message
+                    in expired_messages
+                ):
                     return None, (
                         "The household code has expired. "
-                        "Please send a new household code and try again."
+                        "Please send a new household code "
+                        "and try again."
                     )
 
                 modal_selectors = (
@@ -1475,102 +1531,288 @@ async def _get_outlook_household_code_async(user_email):
 
                 found_confirm = False
 
-                for modal_selector in modal_selectors:
+                for modal_selector in (
+                    modal_selectors
+                ):
                     try:
-                        modals = page.locator(modal_selector)
-                        modal_count = await modals.count()
-                        for modal_index in reversed(range(modal_count)):
-                            modal = modals.nth(modal_index)
+                        modals = (
+                            page.locator(
+                                modal_selector
+                            )
+                        )
+
+                        modal_count = (
+                            await modals.count()
+                        )
+
+                        for modal_index in reversed(
+                            range(modal_count)
+                        ):
+                            modal = modals.nth(
+                                modal_index
+                            )
+
                             if not await modal.is_visible():
                                 continue
-                            buttons = modal.locator("button:visible")
-                            button_count = await buttons.count()
-                            for button_index in reversed(range(button_count)):
-                                button = buttons.nth(button_index)
+
+                            buttons = modal.locator(
+                                "button:visible"
+                            )
+
+                            button_count = (
+                                await buttons.count()
+                            )
+
+                            for button_index in reversed(
+                                range(button_count)
+                            ):
+                                button = buttons.nth(
+                                    button_index
+                                )
+
                                 try:
                                     button_text = (
                                         await button.inner_text()
                                     ).strip()
-                                    if button_text in confirm_texts:
-                                        confirm_button = button
-                                        found_confirm = True
+
+                                    if (
+                                        button_text
+                                        in confirm_texts
+                                    ):
+                                        confirm_button = (
+                                            button
+                                        )
+
+                                        found_confirm = (
+                                            True
+                                        )
+
                                         break
+
                                 except Exception:
                                     continue
+
                             if found_confirm:
                                 break
+
                         if found_confirm:
                             break
+
                     except Exception:
                         continue
 
                 if found_confirm:
                     break
 
-                await page.wait_for_timeout(200)
+                await page.wait_for_timeout(
+                    200
+                )
+
 
             if confirm_button is None:
+
                 try:
-                    timestamp = int(time.time())
-                    screenshot_path = (
-                        f"/tmp/household_result_not_found_{timestamp}.png"
+                    timestamp = int(
+                        time.time()
                     )
+
+                    screenshot_path = (
+                        f"/tmp/"
+                        f"household_result_not_found_"
+                        f"{timestamp}.png"
+                    )
+
                     await page.screenshot(
                         path=screenshot_path,
                         full_page=True,
                     )
+
                     app.logger.error(
-                        "Household result not detected. URL=%s Screenshot=%s",
+                        "Household result not detected. "
+                        "URL=%s Screenshot=%s",
                         page.url,
                         screenshot_path,
                     )
+
                 except Exception:
                     pass
 
                 return None, (
-                    "The household code service did not return a result. "
+                    "The household code service "
+                    "did not return a result. "
                     "Please try again."
                 )
 
-            pages_before = list(context.pages)
+
+            # ==========================================
+            # CLICK OK AND CONFIRM THAT SOMETHING CHANGED
+            # ==========================================
+
+            pages_before = list(
+                context.pages
+            )
+
+            url_before = page.url
 
             try:
                 await confirm_button.click(
                     timeout=10000,
                     force=True,
                 )
+
+                app.logger.info(
+                    "Household OK clicked."
+                )
+
             except Exception as exc:
-                app.logger.exception(
-                    "Household confirm click failed: %s",
+
+                app.logger.warning(
+                    "Normal household OK click failed: %s",
                     exc,
                 )
-                return None, (
-                    "Unable to confirm the household code request. "
-                    "Please try again."
+
+                try:
+                    clicked = (
+                        await confirm_button.evaluate(
+                            """
+                            button => {
+                                button.click();
+                                return true;
+                            }
+                            """
+                        )
+                    )
+
+                    if clicked:
+                        app.logger.info(
+                            "Household OK clicked "
+                            "using JS fallback."
+                        )
+
+                except Exception as js_exc:
+
+                    app.logger.exception(
+                        "Household OK JS fallback "
+                        "failed: %s",
+                        js_exc,
+                    )
+
+                    return None, (
+                        "Unable to confirm the "
+                        "household code request. "
+                        "Please try again."
+                    )
+
+
+            # ==========================================
+            # WAIT UNTIL MODAL CLOSES / PAGE CHANGES
+            # ==========================================
+
+            change_deadline = (
+                time.monotonic() + 15
+            )
+
+            while (
+                time.monotonic()
+                < change_deadline
+            ):
+
+                # New tab opened
+                if (
+                    len(context.pages)
+                    > len(pages_before)
+                ):
+                    app.logger.info(
+                        "Household result "
+                        "opened in new page."
+                    )
+
+                    break
+
+                # Same page navigated
+                if page.url != url_before:
+                    app.logger.info(
+                        "Household result "
+                        "navigated to %s",
+                        page.url,
+                    )
+
+                    break
+
+                # Modal disappeared
+                try:
+                    if not await confirm_button.is_visible():
+                        app.logger.info(
+                            "Household modal closed."
+                        )
+
+                        break
+
+                except Exception:
+                    break
+
+                await page.wait_for_timeout(
+                    200
                 )
 
-            await page.wait_for_timeout(5000)
+
+            await page.wait_for_timeout(
+                1500
+            )
+
+
+            # ==========================================
+            # DETERMINE RESULT PAGE
+            # ==========================================
 
             current_pages = context.pages
-            if len(current_pages) > len(pages_before):
-                code_page = current_pages[-1]
+
+            if (
+                len(current_pages)
+                > len(pages_before)
+            ):
+                code_page = (
+                    current_pages[-1]
+                )
+
             else:
                 code_page = page
+
+
+            # ==========================================
+            # ALLOW RESULT PAGE TO LOAD
+            # ==========================================
 
             try:
                 await code_page.wait_for_load_state(
                     "domcontentloaded",
                     timeout=30000,
                 )
+
             except Exception:
                 pass
 
-            await code_page.wait_for_timeout(1200)
+            await code_page.wait_for_timeout(
+                1200
+            )
 
-            full_text = await safe_body_text(code_page)
+
+            # ==========================================
+            # READ RESULT
+            # ==========================================
+
+            full_text = (
+                await safe_body_text(
+                    code_page
+                )
+            )
+
             full_url = code_page.url
+
             full_normalized = " ".join(
-                (full_text or "").lower().split()
+                (
+                    full_text or ""
+                ).lower().split()
             )
 
             result_expired_messages = (
@@ -1585,13 +1827,21 @@ async def _get_outlook_household_code_async(user_email):
             )
 
             if any(
-                message in full_normalized
-                for message in result_expired_messages
+                message
+                in full_normalized
+                for message
+                in result_expired_messages
             ):
                 return None, (
                     "Link was expired. "
-                    "Please resend the household code and try again."
+                    "Please resend the household "
+                    "code and try again."
                 )
+
+
+            # ==========================================
+            # FIND 4-DIGIT HOUSEHOLD CODE
+            # ==========================================
 
             match = re.search(
                 r"\b\d{4}\b",
@@ -1599,38 +1849,66 @@ async def _get_outlook_household_code_async(user_email):
             )
 
             if match:
-                return match.group(0), None
+                code = match.group(0)
+
+                app.logger.info(
+                    "Household code found: %s",
+                    code,
+                )
+
+                return code, None
+
+
+            # ==========================================
+            # DEBUG IF RESULT STILL NOT FOUND
+            # ==========================================
 
             try:
-                timestamp = int(time.time())
-                screenshot_path = (
-                    f"/tmp/household_code_not_found_{timestamp}.png"
+                timestamp = int(
+                    time.time()
                 )
+
+                screenshot_path = (
+                    f"/tmp/"
+                    f"household_code_not_found_"
+                    f"{timestamp}.png"
+                )
+
                 await code_page.screenshot(
                     path=screenshot_path,
                     full_page=True,
                 )
+
                 app.logger.error(
-                    "Household result opened but no 4-digit code found. URL=%s Screenshot=%s",
+                    "Household result opened but "
+                    "no 4-digit code found. "
+                    "URL=%s Screenshot=%s",
                     full_url,
                     screenshot_path,
                 )
+
             except Exception:
                 pass
 
+
             return None, (
-                "Code page opened, but no 4-digit household code was found."
+                "Code page opened, but no "
+                "4-digit household code was found."
             )
 
+
         except Exception as exc:
+
             app.logger.exception(
                 "Household code system error: %s",
                 exc,
             )
+
             return None, (
                 "System is busy or timed out. "
                 "Please try again."
             )
+
 
         finally:
             await browser.close()
